@@ -72,10 +72,19 @@ bool isPaused = false;
 GLint screenWidth = 800;
 GLint screenHeight = 600;
 
-// CAMERA
+// CAMERA VARIABLES
 glm::vec3 cameraPos = glm::vec3(0.0f, 5.0f, 20.0f);
 glm::vec3 cameraFront = glm::vec3(0.0f, -0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+float yaw = -90.0f;	// Yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right (positive X axis)
+float pitch = 0.0f;
+float lastX = screenWidth / 2.0f;
+float lastY = screenHeight / 2.0f;
+
+// CAMERA SETTINGS
+float cameraSpeed = 0.5f;
+float sensitivity = 0.1f;		// Mouse sensitivity
+
 
 // TERRAIN SETTINGS
 const int terrainGridSize = 128;
@@ -278,14 +287,43 @@ GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource
 
 
 // CALLBACKS
-void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods) { // Change input to continuous event instead of discrete key press
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true); // Close window on ESC key press
 	if (key == GLFW_KEY_P && action == GLFW_PRESS)
 		isPaused = !isPaused; // Toggle pause on P key press
-}
+
+	if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT) && !isPaused)
+		cameraPos += cameraSpeed * cameraFront;
+	if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT) && !isPaused)
+		cameraPos -= cameraSpeed * cameraFront;
+	if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT) && !isPaused)
+		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+	if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT) && !isPaused)
+		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+} 
 void MouseMoveCallback(GLFWwindow* window, double xpos, double ypos) {
-	// Placeholder for mouse movement handling (e.g., camera rotation)
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	float xoffset = xpos - lastX;	// Calculate offset since last frame
+	float yoffset = lastY - ypos;	// Reversed since y-coordinates go from bottom to top
+
+	lastX = (float)xpos;			// Update lastX and lastY
+	lastY = (float)ypos;
+
+	xoffset *= sensitivity;			// Apply sensitivity
+	yoffset *= sensitivity;
+
+	yaw += xoffset;					// Update yaw and pitch
+	pitch += yoffset;
+
+	pitch = clamp(pitch, -89.0f, 89.0f);	// Constrain pitch
+
+	glm::vec3 front;				// Calculate new front vector
+	front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	front.y = sin(glm::radians(pitch));
+	front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	cameraFront = glm::normalize(front);
 }
 void MouseScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 	// Placeholder for mouse scroll handling (e.g., zooming)
@@ -294,7 +332,10 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	// Placeholder for mouse button handling (e.g., selecting terrain points)
 }
 
-
+// MATH
+double clamp(double value, double min, double max) {
+	return std::max(min, std::min(max, value));
+}
 
 // TERRAIN GENERATION
 double perlinNoise2D(double x, double y) {
