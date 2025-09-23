@@ -63,7 +63,8 @@ const char* fragmentShaderSource = R"glsl(
 		FragColor = vec4(result, 1.0);
 })glsl";
 
-
+// MATH CONSTANTS
+const double PI = 3.14159265358979323846;
 
 // RUNTIME VARIABLES
 bool isPaused = false;
@@ -110,11 +111,25 @@ void MouseScrollCallback(GLFWwindow* window, double xpos, double ypos);					// C
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);			// Callback for mouse button input
 
 // TERRAIN GENERATION
+/*
+Function to sample 2D Perlin noise at coordinates (x, y).
+Generates smooth, continuous noise values that can be used for terrain height mapping.
+- Based Zipped's implementation in C++ -
+*/
 double perlinNoise2D(double x, double y);
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double));	// Generate terrain mesh using Perlin noise
 
 // MATH
 double clamp(double value, double min, double max);
+/*
+Produces the dot product of the distance and gradient vectors.
+*/
+double dotGridGradient(int ix, int iy, double x, double y);
+/*
+Interpolation function (smoothstep) optimized for perlin.
+*/
+double interpolate(double a0, double a1, double w);
+
 
 
 // TESTING
@@ -349,11 +364,63 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 double clamp(double value, double min, double max) {
 	return std::max(min, std::min(max, value));
 }
+glm::vec2 randomGradient(int ix, int iy) {
+	const unsigned w = 8 * sizeof(unsigned);
+	const unsigned s = w / 2; // rotation width
+	unsigned a = ix, b = iy;
+	a *= 3284157443;
+	
+	b ^= a << s | a >> (w - s);
+	b *= 1911520717;
+
+	a ^= b << s | b >> (w - s);
+	a *= 2048419325;
+
+	float random = a * (PI / ~(~0u >> 1));
+	return glm::vec2(cos(random), sin(random));
+}
+double dotGridGradient(int ix, int iy, double x, double y) {
+	glm::vec2 gradient = randomGradient(ix, iy);
+
+	// Clculate the distance vector
+	double dx = x - (double)ix;
+	double dy = y - (double)iy;
+
+	// Compute and return the dot-product
+	return (dx * gradient.x + dy * gradient.y);
+}
+double interpolate(double a0, double a1, double w) {
+	// Use smoothstep interpolation
+	return (a1 - a0) * (3.0 - w * 2.0) * w * w + a0;
+}
 
 // TERRAIN GENERATION
 double perlinNoise2D(double x, double y) {
 	// Placeholder for Perlin noise function
-	return (sin(x) + cos(y)) * 0.5;
+
+	// Grid cell coordinates
+	int x0 = (int)floor(x);
+	int y0 = (int)floor(y);
+	int x1 = x0 + 1;
+	int y1 = y0 + 1;
+
+	// Compute sampled interpolation weights
+	double sx = x - (double)x0;
+	double sy = y - (double)y0;
+
+	// Compute dot products
+	// Top corners
+	double n0 = dotGridGradient(x0, y0, x, y);
+	double n1 = dotGridGradient(x1, y0, x, y);
+	double ix0 = interpolate(n0, n1, sx);		// Interpolate horizontally
+
+	// Bottom corners
+	n0 = dotGridGradient(x0, y1, x, y);
+	n1 = dotGridGradient(x1, y1, x, y);
+	double ix1 = interpolate(n0, n1, sx);		// Interpolate horizontally
+
+	// Interpolate vertically
+	return interpolate(ix0, ix1, sy);
 }
 void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double)) {
 	vertices.clear();
@@ -368,7 +435,7 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 		for (int x = 0; x < terrainGridSize; ++x) {
 			double worldX = (x - terrainGridSize / 2.0) * terrainVertexSpacing;
 			double worldZ = (z - terrainGridSize / 2.0) * terrainVertexSpacing;
-			double h = noise_fun(worldX, worldZ); // Scale later using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
+			double h = noise_fun(worldX*0.08, worldZ*0.08)*8.; // Scale later using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
 			heights[z * terrainGridSize + x] = h;
 		}
 	}
