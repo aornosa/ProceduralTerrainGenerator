@@ -108,6 +108,10 @@ void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &in
 double clamp(double value, double min, double max);
 
 
+// TESTING
+void genCube(std::vector<GLfloat>& vertices, std::vector<GLuint>& indices); // Generate a cube mesh for testing purposes
+
+
 int main() {
 	// Initialize OpenGL and create window
 	GLFWwindow* window = initOpenGL();
@@ -122,18 +126,57 @@ int main() {
 	// Generate terrain mesh
 	generateTerrainMesh(terrainVertices, terrainIndices, perlinNoise2D);
 
+	// Cube for testing
+	std::vector<GLfloat> cubeVertices;
+	std::vector<GLuint> cubeIndices;
+	genCube(cubeVertices, cubeIndices);
+
+
+	GLuint cubeVBO = 0, cubeVAO = 0, cubeEBO = 0;
+	CreateBufferArrayObjects(cubeVBO, cubeVAO, cubeEBO, cubeVertices.data(), cubeVertices.size(), cubeIndices.data(), cubeIndices.size());
+
+	// Create a simple 1x1 white texture so shader sampling is valid
+	GLuint whiteTexture = 0;
+	glGenTextures(1, &whiteTexture);
+	glBindTexture(GL_TEXTURE_2D, whiteTexture);
+	unsigned char whitePixel[3] = { 255, 255, 255 };
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, whitePixel);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		UpdateCamera(shaderProgram, cameraPos);
+
+		glUseProgram(shaderProgram);
+		glBindTexture(GL_TEXTURE_2D, whiteTexture);
+		GLint texLoc = glGetUniformLocation(shaderProgram, "texture1");
+		if (texLoc >= 0) glUniform1i(texLoc, 0);
+
+		// Set light and view position uniforms
+		GLint lightLoc = glGetUniformLocation(shaderProgram, "lightPos");
+		if (lightLoc >= 0) glUniform3f(lightLoc, 10.0f, 10.0f, 10.0f);
+		GLint viewLocP = glGetUniformLocation(shaderProgram, "viewPos");
+		if (viewLocP >= 0) glUniform3f(viewLocP, cameraPos.x, cameraPos.y, cameraPos.z);
+
+		// Model matrix for the cube
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, 1.0f, 0.0f)); // lift slightly so it's visible above y=0
+		model = glm::scale(model, glm::vec3(2.0f)); // make it a bit bigger
+		GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+		if (modelLoc >= 0) glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+		glBindVertexArray(cubeVAO);
+		glDrawElements(GL_TRIANGLES, (GLsizei)cubeIndices.size(), GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
 
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 }
-
-
 
 // RENDERING
 void UpdateCamera(GLuint shaderProgram, glm::vec3 cameraPos) {
@@ -346,6 +389,57 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 		}
 	}
 }
+
+
+// TESTING 
+void genCube(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices) {
+	vertices = {
+		// Front face (z = +0.5)
+		-0.5f, -0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   0.0f, 0.0f,
+		 0.5f, -0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   1.0f, 0.0f,
+		 0.5f,  0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   1.0f, 1.0f,
+		-0.5f,  0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   0.0f, 1.0f,
+		// Back face (z = -0.5)
+		-0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   1.0f, 0.0f,
+		 0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   0.0f, 0.0f,
+		 0.5f,  0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   0.0f, 1.0f,
+		-0.5f,  0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   1.0f, 1.0f,
+		// Left face (x = -0.5)
+		-0.5f, -0.5f, -0.5f,  -1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
+		-0.5f, -0.5f,  0.5f,  -1.0f,  0.0f,  0.0f,   1.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f,  -1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
+		-0.5f,  0.5f, -0.5f,  -1.0f,  0.0f,  0.0f,   0.0f, 1.0f,
+		// Right face (x = +0.5)
+		 0.5f, -0.5f, -0.5f,   1.0f,  0.0f,  0.0f,   1.0f, 0.0f,
+		 0.5f, -0.5f,  0.5f,   1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
+		 0.5f,  0.5f,  0.5f,   1.0f,  0.0f,  0.0f,   0.0f, 1.0f,
+		 0.5f,  0.5f, -0.5f,   1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
+		 // Top face (y = +0.5)
+		 -0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   0.0f, 0.0f,
+		  0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 0.0f,
+		  0.5f,  0.5f, -0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 1.0f,
+		 -0.5f,  0.5f, -0.5f,   0.0f,  1.0f,  0.0f,   0.0f, 1.0f,
+		 // Bottom face (y = -0.5)
+		 -0.5f, -0.5f,  0.5f,   0.0f, -1.0f,  0.0f,   0.0f, 0.0f,
+		  0.5f, -0.5f,  0.5f,   0.0f, -1.0f,  0.0f,   1.0f, 0.0f,
+		  0.5f, -0.5f, -0.5f,   0.0f, -1.0f,  0.0f,   1.0f, 1.0f,
+		 -0.5f, -0.5f, -0.5f,   0.0f, -1.0f,  0.0f,   0.0f, 1.0f
+	};
+
+	indices;
+	indices.reserve(36);
+	for (GLuint f = 0; f < 6; ++f) {
+		GLuint base = f * 4;
+		// two triangles per face
+		indices.push_back(base + 0);
+		indices.push_back(base + 1);
+		indices.push_back(base + 2);
+		indices.push_back(base + 0);
+		indices.push_back(base + 2);
+		indices.push_back(base + 3);
+	}
+}
+
 
 
 // INITIALIZATION
