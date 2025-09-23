@@ -135,6 +135,9 @@ int main() {
 	// Generate terrain mesh
 	generateTerrainMesh(terrainVertices, terrainIndices, perlinNoise2D);
 
+	// Create buffer and array objects for terrain
+	CreateBufferArrayObjects(terrainVBO, terrainVAO, terrainEBO, terrainVertices.data(), terrainVertices.size(), terrainIndices.data(), terrainIndices.size());
+
 	// Cube for testing
 	std::vector<GLfloat> cubeVertices;
 	std::vector<GLuint> cubeIndices;
@@ -181,6 +184,13 @@ int main() {
 		glDrawElements(GL_TRIANGLES, (GLsizei)cubeIndices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
 
+		glm::mat4 terrainModel = glm::mat4(1.0f);
+		modelLoc = glGetUniformLocation(shaderProgram, "model");
+		if (modelLoc >= 0) glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(terrainModel));
+
+		glBindVertexArray(terrainVAO);
+		glDrawElements(GL_TRIANGLES, (GLsizei)terrainIndices.size(), GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -285,6 +295,9 @@ GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource
 	return shaderProgram;			// Return shader program ID
 }
 
+// DRAWING
+void DrawTerrain(GLuint shaderProgram, GLuint VAO, size_t indexCount) {
+}
 
 // CALLBACKS
 void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods) { // Change input to continuous event instead of discrete key press
@@ -390,11 +403,9 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 			vertices.push_back(normal.y);
 			vertices.push_back(normal.z);
 
-			/*
 			// Push tex coord data
 			vertices.push_back(u);
 			vertices.push_back(v);
-			*/
 		}
 	}
 
@@ -411,8 +422,8 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 		   |      \  |
 		(z+1,x)--(z, x+1)
 	*/
-	for (int z = 0; z < terrainGridSize; ++z) {
-		for (int x = 0; x < terrainGridSize; ++x) {
+	for (int z = 0; z < terrainGridSize-1; ++z) {
+		for (int x = 0; x < terrainGridSize-1; ++x) {
 			GLuint topLeft = z * terrainGridSize + x;
 			GLuint topRight = topLeft + 1;
 			GLuint bottomLeft = (z + 1) * terrainGridSize + x;
