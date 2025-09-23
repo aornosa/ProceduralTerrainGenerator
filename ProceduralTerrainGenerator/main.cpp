@@ -215,7 +215,7 @@ int main() {
 // RENDERING
 void UpdateCamera(GLuint shaderProgram, glm::vec3 cameraPos) {
 	glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 100.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 1000.0f);
 	glUseProgram(shaderProgram);
 	GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
 	GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
@@ -596,6 +596,7 @@ GLFWwindow* initOpenGL()
 	glEnable(GL_CULL_FACE);								// Enable face culling
 	glEnable(GL_BLEND);									// Enable blending (transparency)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);	// Set blending function (transparency)
+	glClearColor(0.45f, 0.65f, 1.0f, 1.0f);			// Set clear color (sky blue)
 
 	glfwShowWindow(window); // Show window
 	
