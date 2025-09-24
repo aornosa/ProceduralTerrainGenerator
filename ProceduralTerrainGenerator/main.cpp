@@ -16,8 +16,8 @@
 // Basic vertex shader
 const char* vertexShaderSource = R"glsl(
 	#version 330 core
-	layout(location = 0) in vec3 aPos;    // Vertex position
-	layout(location = 1) in vec3 aNormal; // Vertex normal
+	layout(location = 0) in vec3 aPos;		// Vertex position
+	layout(location = 1) in vec3 aNormal;	// Vertex normal
 	layout(location = 2) in vec2 aTexCoord; // Vertex texture coordinate
 	
 	out vec3 FragPos;
@@ -38,27 +38,34 @@ const char* vertexShaderSource = R"glsl(
 const char* fragmentShaderSource = R"glsl(
 	#version 330 core
 	out vec4 FragColor;
+
 	in vec3 FragPos;
 	in vec3 Normal;
 	in vec2 TexCoord;
+
 	uniform vec3 lightPos;
 	uniform vec3 viewPos;
 	uniform sampler2D texture1;
+
 	void main() {
-		// Ambient
+		// Ambient Lighting
 		float ambientStrength = 0.3;
 		vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
-		// Diffuse
+
+		// Diffuse Lighting
 		vec3 norm = normalize(Normal);
 		vec3 lightDir = normalize(lightPos - FragPos);
 		float diff = max(dot(norm, lightDir), 0.0);
 		vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
-		// Specular
+
+		// Specular Lighting
 		float specularStrength = 0.5;
 		vec3 viewDir = normalize(viewPos - FragPos);
 		vec3 reflectDir = reflect(-lightDir, norm);
 		float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
 		vec3 specular = specularStrength * spec * vec3(1.0, 1.0, 1.0);
+
+
 		vec3 result = (ambient + diffuse + specular) * texture(texture1, TexCoord).rgb;
 		FragColor = vec4(result, 1.0);
 })glsl";
@@ -77,20 +84,22 @@ GLint screenHeight = 600;
 glm::vec3 cameraPos = glm::vec3(0.0f, 5.0f, 20.0f);
 glm::vec3 cameraFront = glm::vec3(0.0f, -0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-float yaw = -90.0f;	// Yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right (positive X axis)
+float yaw = -90.0f;	
 float pitch = 0.0f;
 float lastX = screenWidth / 2.0f;
 float lastY = screenHeight / 2.0f;
 
 // CAMERA SETTINGS
-float cameraSpeed = 0.5f;
+float cameraSpeed = 0.5f;		// Camera movement speed
 float sensitivity = 0.1f;		// Mouse sensitivity
 
 
 // TERRAIN SETTINGS
-const int terrainGridSize = 128;
+const int terrainGridSize = 2*1024;
 const float terrainVertexSpacing = 1.f;		// Only applies to X and Z axis
-const int seed = 12345;
+const float terrainHeightScale = 15.f;		// Scale height (Y axis)
+const float terrainFrequency = 0.0005f;		// Frequency of the noise function
+const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 
 
 // FUNCTION DECLARATIONS
@@ -147,7 +156,7 @@ int main() {
 
 	GLuint terrainVBO, terrainVAO, terrainEBO; // Vertex Buffer Object, Vertex Array Object, Element Buffer Object
 
-	// Generate terrain mesh
+	// Generate terrain mesh (Call only once per chunk)
 	generateTerrainMesh(terrainVertices, terrainIndices, perlinNoise2D);
 
 	// Create buffer and array objects for terrain
@@ -162,7 +171,7 @@ int main() {
 	GLuint cubeVBO = 0, cubeVAO = 0, cubeEBO = 0;
 	CreateBufferArrayObjects(cubeVBO, cubeVAO, cubeEBO, cubeVertices.data(), cubeVertices.size(), cubeIndices.data(), cubeIndices.size());
 
-	// Create a simple 1x1 white texture so shader sampling is valid
+	// Create a simple 1x1 white texture so shader sampling is valid (CHANGE FOR TEXTURE GENERATION/SAMPLING)
 	GLuint whiteTexture = 0;
 	glGenTextures(1, &whiteTexture);
 	glBindTexture(GL_TEXTURE_2D, whiteTexture);
@@ -177,6 +186,7 @@ int main() {
 
 		UpdateCamera(shaderProgram, cameraPos);
 
+		// TESTING RENDER CUBE
 		glUseProgram(shaderProgram);
 		glBindTexture(GL_TEXTURE_2D, whiteTexture);
 		GLint texLoc = glGetUniformLocation(shaderProgram, "texture1");
@@ -198,7 +208,8 @@ int main() {
 		glBindVertexArray(cubeVAO);
 		glDrawElements(GL_TRIANGLES, (GLsizei)cubeIndices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
-
+		
+		// NEEDS LIGHT, TEXTURE AND MODEL MATRIX WHEN REFACTORED INTO FUNCTION
 		glm::mat4 terrainModel = glm::mat4(1.0f);
 		modelLoc = glGetUniformLocation(shaderProgram, "model");
 		if (modelLoc >= 0) glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(terrainModel));
@@ -207,6 +218,8 @@ int main() {
 		glDrawElements(GL_TRIANGLES, (GLsizei)terrainIndices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
 
+
+		// Swap buffers and poll events (Frame main loop)
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
@@ -215,7 +228,7 @@ int main() {
 // RENDERING
 void UpdateCamera(GLuint shaderProgram, glm::vec3 cameraPos) {
 	glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 1000.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 3000.0f);
 	glUseProgram(shaderProgram);
 	GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
 	GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
@@ -315,7 +328,7 @@ void DrawTerrain(GLuint shaderProgram, GLuint VAO, size_t indexCount) {
 }
 
 // CALLBACKS
-void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods) { // Change input to continuous event instead of discrete key press
+void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods) { // TODO: Change input to continuous event instead of discrete key press
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true); // Close window on ESC key press
 	if (key == GLFW_KEY_P && action == GLFW_PRESS)
@@ -435,7 +448,8 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 		for (int x = 0; x < terrainGridSize; ++x) {
 			double worldX = (x - terrainGridSize / 2.0) * terrainVertexSpacing;
 			double worldZ = (z - terrainGridSize / 2.0) * terrainVertexSpacing;
-			double h = noise_fun(worldX*0.08, worldZ*0.08)*8.; // Scale later using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
+			// TODO: USE SEVERAL OCTAVES OF NOISE TO GET MORE REALISTIC TERRAIN
+			double h = pow(noise_fun(worldX*terrainFrequency, worldZ*terrainFrequency)*terrainHeightScale, 4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
 			heights[z * terrainGridSize + x] = h;
 		}
 	}

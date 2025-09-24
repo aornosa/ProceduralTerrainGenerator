@@ -1,0 +1,3 @@
+Aerial/Atmospheric Perspective - https://www.youtube.com/watch?v=oQksg57qsRA
+Shadow Mapping - https://www.youtube.com/watch?v=9g-4aJhCnyY
+Sun/Realistic Sky Shader - https://www.shadertoy.com/view/tdSXzD
