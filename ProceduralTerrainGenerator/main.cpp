@@ -126,6 +126,7 @@ Generates smooth, continuous noise values that can be used for terrain height ma
 - Based Zipped's implementation in C++ -
 */
 double perlinNoise2D(double x, double y);
+double fractalNoise2D(double x, double y, int octaves, double persistence); // Generate fractal noise by combining multiple octaves of Perlin noise
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double));	// Generate terrain mesh using Perlin noise
 
 // MATH
@@ -138,6 +139,7 @@ double dotGridGradient(int ix, int iy, double x, double y);
 Interpolation function (smoothstep) optimized for perlin.
 */
 double interpolate(double a0, double a1, double w);
+
 
 
 
@@ -435,6 +437,19 @@ double perlinNoise2D(double x, double y) {
 	// Interpolate vertically
 	return interpolate(ix0, ix1, sy);
 }
+double fractalNoise2D(double x, double y, int octaves, double persistence) {
+	double total = 0.0;
+	double frequency = 1.0;
+	double amplitude = 1.0;
+	double maxValue = 0.0; // Used for normalizing result to [0,1]
+	for (int i = 0; i < octaves; ++i) {
+		total += perlinNoise2D(x * frequency, y * frequency) * amplitude;
+		maxValue += amplitude;
+		amplitude *= persistence;
+		frequency *= 2.0;
+	}
+	return total / maxValue; // Normalize to [0,1]
+}
 void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double)) {
 	vertices.clear();
 	indices.clear();
@@ -449,7 +464,7 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 			double worldX = (x - terrainGridSize / 2.0) * terrainVertexSpacing;
 			double worldZ = (z - terrainGridSize / 2.0) * terrainVertexSpacing;
 			// TODO: USE SEVERAL OCTAVES OF NOISE TO GET MORE REALISTIC TERRAIN
-			double h = pow(noise_fun(worldX*terrainFrequency, worldZ*terrainFrequency)*terrainHeightScale, 4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
+			double h = pow(fractalNoise2D(worldX * terrainFrequency, worldZ * terrainFrequency, 4, 0.5) * terrainHeightScale,4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
 			heights[z * terrainGridSize + x] = h;
 		}
 	}
