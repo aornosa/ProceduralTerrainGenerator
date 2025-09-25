@@ -99,6 +99,7 @@ const int terrainGridSize = 2*1024;
 const float terrainVertexSpacing = 1.f;		// Only applies to X and Z axis
 const float terrainHeightScale = 15.f;		// Scale height (Y axis)
 const float terrainFrequency = 0.0005f;		// Frequency of the noise function
+const int noiseOctaveN = 6;					// Number of noise layers
 const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 
 
@@ -108,7 +109,7 @@ GLFWwindow* initOpenGL();
 // RENDERING
 void UpdateCamera(GLuint shaderProgram, glm::vec3 cameraPos);
 void CreateBufferArrayObjects(GLuint& VBO, GLuint& VAO, GLuint& EBO, const float* vertices, size_t vertexCount, const GLuint* indices, size_t indexCount); // Add Vertex Array Object to new Vertex Buffer Object using data from vertices array
-void UpdateBufferArrayObjects(GLuint VBO, const float* vertices, size_t vertexCount); // Update existing Vertex Buffer Object with new data from vertices array (Add new chunks)
+void UpdateBufferArrayObjects(GLuint& VBO, GLuint& EBO, const float* vertices, size_t vertexCount, const GLuint* indices, size_t indexCount); // Update existing Vertex Buffer Object with new data from vertices array (Add new chunks)
 
 // SHADING
 GLuint CompileShaderProgram(const char* vertexSource, const char* fragmentSource); // Compile and link vertex and fragment shaders into a shader program
@@ -126,6 +127,10 @@ Generates smooth, continuous noise values that can be used for terrain height ma
 - Based Zipped's implementation in C++ -
 */
 double perlinNoise2D(double x, double y);
+/*
+Layered Perlin noise function to create fractal noise.
+Combines multiple octaves of Perlin noise to produce more complex and natural-looking terrain features.
+*/
 double fractalNoise2D(double x, double y, int octaves, double persistence); // Generate fractal noise by combining multiple octaves of Perlin noise
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double));	// Generate terrain mesh using Perlin noise
 
@@ -139,6 +144,18 @@ double dotGridGradient(int ix, int iy, double x, double y);
 Interpolation function (smoothstep) optimized for perlin.
 */
 double interpolate(double a0, double a1, double w);
+/*
+Linear interpolation between a and b with t in [0, 1].
+a and b are the values to interpolate between,
+t is the interpolation factor.
+*/
+double lerp(double a, double b, double t);	
+/*
+Smoother interpolation between a and b with t in [0, 1].
+a and b are the values to interpolate between,
+t is the interpolation factor.
+*/
+double slerp(double a, double b, double t);
 
 
 
@@ -464,7 +481,7 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 			double worldX = (x - terrainGridSize / 2.0) * terrainVertexSpacing;
 			double worldZ = (z - terrainGridSize / 2.0) * terrainVertexSpacing;
 			// TODO: USE SEVERAL OCTAVES OF NOISE TO GET MORE REALISTIC TERRAIN
-			double h = pow(fractalNoise2D(worldX * terrainFrequency, worldZ * terrainFrequency, 4, 0.5) * terrainHeightScale,4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
+			double h = pow(fractalNoise2D(worldX * terrainFrequency, worldZ * terrainFrequency, noiseOctaveN, 0.5) * terrainHeightScale,4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
 			heights[z * terrainGridSize + x] = h;
 		}
 	}
