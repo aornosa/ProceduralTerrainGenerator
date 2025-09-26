@@ -361,6 +361,10 @@ void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 	if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT) && !isPaused)
 		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+	if (key == GLFW_KEY_SPACE && (action == GLFW_PRESS || action == GLFW_REPEAT) && !isPaused)
+		cameraPos += cameraSpeed * cameraUp;
+	if (key == GLFW_KEY_LEFT_SHIFT && (action == GLFW_PRESS || action == GLFW_REPEAT) && !isPaused)
+		cameraPos -= cameraSpeed * cameraUp;
 } 
 void MouseMoveCallback(GLFWwindow* window, double xpos, double ypos) {
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
