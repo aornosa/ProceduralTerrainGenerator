@@ -143,7 +143,7 @@ void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &in
 
 
 // TERRAIN RENDERING
-void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<Chunk*>& visibleChunks, glm::vec3 cameraPos, int renderDistance);
+void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector</*Chunk**/long long>& visibleChunks, glm::vec3 cameraPos, int renderDistance);
 
 
 // MATH
@@ -193,12 +193,12 @@ public:
 	Chunk() : position(glm::vec2(0.0f)), isInitialized(false) {}
 	Chunk(glm::vec2 pos) : position(pos), isInitialized(false) {}
 
-	~Chunk() {
+	~Chunk() {/*
 		if (isInitialized) {
 			glDeleteVertexArrays(1, &VAO);
 			glDeleteBuffers(1, &VBO);
 			glDeleteBuffers(1, &EBO);
-		}
+		}*/
 	}
 
 	void initialize() {
@@ -242,8 +242,8 @@ int main() {
 	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource, fragmentShaderSource);
 
 	std::unordered_map<long long, Chunk> chunkMap; // Map to store chunks by their position key
-	std::vector<long long> loadedChunkKeys; // List of currently loaded chunk keys
-	std::vector<Chunk*> visibleChunks;
+	std::vector<long long> visibleChunks; // List of currently loaded chunk keys
+	//std::vector<Chunk*> visibleChunks;
 
 	/*REMOVE*/
 	// Declare terrain data structures
@@ -315,11 +315,12 @@ int main() {
 
 		// Render visible chunks
 		std::cout << "Visible Chunks: " << visibleChunks.size() << "\n";
-		for (Chunk *chunk : visibleChunks) {
-			if (!chunk->isInitialized) continue; // Safety check (skip if chunk not loaded yet)
+		for (long long keys : visibleChunks) {
+			Chunk& chunk = chunkMap.at(keys);
+			if (!chunk.isInitialized) continue; // Safety check (skip if chunk not loaded yet)
 
-			glBindVertexArray(chunk->VAO);
-			glDrawElements(GL_TRIANGLES, (GLsizei)chunk->indices.size(), GL_UNSIGNED_INT, 0);
+			glBindVertexArray(chunk.VAO);
+			glDrawElements(GL_TRIANGLES, (GLsizei)chunk.indices.size(), GL_UNSIGNED_INT, 0);
 
 			glBindVertexArray(0);
 		}
@@ -652,7 +653,7 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 }
 
 // TERRAIN RENDERING
-void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<Chunk*>& visibleChunks, glm::vec3 cameraPos, int renderDistance) {
+void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<long long/*Chunk* */>& visibleChunks, glm::vec3 cameraPos, int renderDistance) {
 	// Determine current chunk coordinates based on camera position
 	int currentChunkX = (int)floor(cameraPos.x / (terrainGridSize * terrainVertexSpacing));
 	int currentChunkZ = (int)floor(cameraPos.z / (terrainGridSize * terrainVertexSpacing));
@@ -660,13 +661,19 @@ void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::ve
 	// Remove chunks that are no longer within render distance (O(n) due to vector structure)
 	visibleChunks.erase(
 		std::remove_if(visibleChunks.begin(), visibleChunks.end(),
-			[&](Chunk* chunk) {		// Lambda to check if chunk is outside render distance (captured chunk coords)
-				int dx = chunk->position.x - currentChunkX;
-				int dz = chunk->position.y - currentChunkZ;
+			[&](long long key) {		// Lambda to check if chunk is outside render distance (captured chunk coords)
+				// Get chunk reference from the map
+				auto it = chunkMap.find(key);
+				if (it == chunkMap.end()) return true; // Chunk missing, remove from visibleChunks
+
+				Chunk& chunk = it->second;
+
+				int dx = chunk.position.x - currentChunkX;
+				int dz = chunk.position.y - currentChunkZ;
 
 				// Calculate if chunk is outside render distance
 				if (dx*dx + dz*dz > renderDistance*renderDistance) {
-					chunk->isActive = false;	// Mark chunk as inactive
+					chunk.isActive = false;	// Mark chunk as inactive
 					return true;				// Remove from visible chunks
 				}
 				return false;					// Keep in visible chunks
@@ -693,14 +700,14 @@ void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::ve
 				if (it->second.isActive) continue;
 				else {
 					it->second.load();
-					visibleChunks.push_back(&it->second);
+					visibleChunks.push_back(chunkKey);
 				}
 			}
 			else { // Create new chunk if it doesn't exist
 				Chunk newChunk = Chunk(glm::vec2(chunkX, chunkZ));
 				newChunk.load();
 				chunkMap[chunkKey] = newChunk;
-				visibleChunks.push_back(&chunkMap[chunkKey]);
+				visibleChunks.push_back(chunkKey);
 			}
 		}
 	}
