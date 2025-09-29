@@ -48,6 +48,13 @@ const char* fragmentShaderSource = R"glsl(
 	uniform vec3 viewPos;
 	uniform sampler2D texture1;
 
+	// Camera and fog uniforms
+	uniform vec3 cameraPos;
+	uniform vec3 fogColor = vec3(0.0, 0.0, 0.0);
+	uniform float fogDensity = 0.0;
+	uniform float maxFogDistance;
+	uniform float minFogDistance;
+
 	void main() {
 		// Ambient Lighting
 		float ambientStrength = 0.3;
@@ -66,8 +73,15 @@ const char* fragmentShaderSource = R"glsl(
 		float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
 		vec3 specular = specularStrength * spec * vec3(1.0, 1.0, 1.0);
 
-
 		vec3 result = (ambient + diffuse + specular) * texture(texture1, TexCoord).rgb;
+		
+		// Add fog
+		if(fogDensity > 0.0) {
+			float distance = length(FragPos - cameraPos);
+			float fogFactor = 1.0 - exp(-distance * fogDensity);
+			
+			result = mix(result, fogColor, fogFactor); 
+		}
 		FragColor = vec4(result, 1.0);
 })glsl";
 
@@ -102,6 +116,9 @@ const float terrainHeightScale = 15.f;		// Scale height (Y axis)
 const float terrainFrequency = 0.0005f;		// Frequency of the noise function
 const int noiseOctaveN = 6;					// Number of noise layers
 const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
+
+// SKY SETTINGS
+const glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
 
 // RENDER SETTINGS
 const int renderDistance = 6;			// Render distance in chunks
@@ -262,6 +279,9 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	
+	// Link shader program
+	glUseProgram(shaderProgram);
+
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -269,7 +289,6 @@ int main() {
 		updateVisibleChunks(chunkMap, visibleChunks, cameraPos, renderDistance); // Update visible chunks based on camera position and render distance
 
 		// TESTING RENDER CUBE
-		glUseProgram(shaderProgram);
 		glBindTexture(GL_TEXTURE_2D, whiteTexture);
 		GLint texLoc = glGetUniformLocation(shaderProgram, "texture1");
 		if (texLoc >= 0) glUniform1i(texLoc, 0);
@@ -786,8 +805,8 @@ GLFWwindow* initOpenGL()
 	glEnable(GL_DEPTH_TEST);							// Enable depth testing
 	glEnable(GL_CULL_FACE);								// Enable face culling
 	glEnable(GL_BLEND);									// Enable blending (transparency)
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);	// Set blending function (transparency)
-	glClearColor(0.45f, 0.65f, 1.0f, 1.0f);			// Set clear color (sky blue)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);					// Set blending function (transparency)
+	glClearColor(skyColor.x, skyColor.y, skyColor.z, skyColor.w);		// Set clear color (sky blue)
 
 	glfwShowWindow(window); // Show window
 	
