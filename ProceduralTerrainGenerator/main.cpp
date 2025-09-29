@@ -104,7 +104,7 @@ const int noiseOctaveN = 6;					// Number of noise layers
 const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 
 // RENDER SETTINGS
-const int renderDistance = 1;			// Render distance in chunks
+const int renderDistance = 3;			// Render distance in chunks
 
 // OBJECT DECLARATIONS
 class Chunk;
@@ -139,7 +139,7 @@ Combines multiple octaves of Perlin noise to produce more complex and natural-lo
 */
 double fractalNoise2D(double x, double y, int octaves, double persistence); // Generate fractal noise by combining multiple octaves of Perlin noise
 // TODO: REFACTOR NOISE FUNCTION INPUT
-void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double));	// Generate terrain mesh using Perlin noise
+void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double), glm::vec2 chunkPos);	// Generate terrain mesh using Perlin noise
 
 
 // TERRAIN RENDERING
@@ -202,7 +202,7 @@ public:
 	}
 
 	void initialize() {
-		generateTerrainMesh(vertices, indices, perlinNoise2D);
+		generateTerrainMesh(vertices, indices, perlinNoise2D, position);
 		CreateBufferArrayObjects(VBO, VAO, EBO, vertices.data(), vertices.size(), indices.data(), indices.size());
 		isInitialized = true;
 		isActive = true;
@@ -253,7 +253,7 @@ int main() {
 	GLuint terrainVBO, terrainVAO, terrainEBO; // Vertex Buffer Object, Vertex Array Object, Element Buffer Object
 
 	// Generate terrain mesh (Call only once per chunk)
-	generateTerrainMesh(terrainVertices, terrainIndices, perlinNoise2D);
+	//generateTerrainMesh(terrainVertices, terrainIndices, perlinNoise2D);
 
 	// Create buffer and array objects for terrain
 	CreateBufferArrayObjects(terrainVBO, terrainVAO, terrainEBO, terrainVertices.data(), terrainVertices.size(), terrainIndices.data(), terrainIndices.size());
@@ -266,7 +266,7 @@ int main() {
 
 	GLuint cubeVBO = 0, cubeVAO = 0, cubeEBO = 0;
 	CreateBufferArrayObjects(cubeVBO, cubeVAO, cubeEBO, cubeVertices.data(), cubeVertices.size(), cubeIndices.data(), cubeIndices.size());
-
+	/*REMOVE*/
 	// Create a simple 1x1 white texture so shader sampling is valid (CHANGE FOR TEXTURE GENERATION/SAMPLING)
 	GLuint whiteTexture = 0;
 	glGenTextures(1, &whiteTexture);
@@ -276,9 +276,9 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	/*REMOVE*/
+	
 
-
+	updateVisibleChunks(chunkMap, visibleChunks, cameraPos, renderDistance); // Initial update of visible chunks based on camera position and render distance
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -317,7 +317,18 @@ int main() {
 		std::cout << "Visible Chunks: " << visibleChunks.size() << "\n";
 		for (long long keys : visibleChunks) {
 			Chunk& chunk = chunkMap.at(keys);
+			std::cout << "Rendering Chunk at: (" << chunk.position.x << ", " << chunk.position.y << ")\n";
 			if (!chunk.isInitialized) continue; // Safety check (skip if chunk not loaded yet)
+
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(
+				chunk.position.x * terrainGridSize * terrainVertexSpacing,
+				0.0f,
+				chunk.position.y * terrainGridSize * terrainVertexSpacing
+			));
+			GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+			if (modelLoc >= 0)
+				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
 			glBindVertexArray(chunk.VAO);
 			glDrawElements(GL_TRIANGLES, (GLsizei)chunk.indices.size(), GL_UNSIGNED_INT, 0);
@@ -564,19 +575,23 @@ double fractalNoise2D(double x, double y, int octaves, double persistence) {
 	}
 	return total / maxValue; // Normalize to [0,1]
 }
-void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double)) {
+void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double), glm::vec2 chunkPos) {
 	vertices.clear();
 	indices.clear();
 
 	vertices.reserve(terrainGridSize * terrainGridSize * 8);
 	indices.reserve((terrainGridSize - 1) * (terrainGridSize - 1) * 6);
 
+	// Compute world offset of this chunk
+	double chunkWorldX = chunkPos.x * terrainGridSize * terrainVertexSpacing;
+	double chunkWorldZ = chunkPos.y * terrainGridSize * terrainVertexSpacing;
+
 	// Precompute heights
 	std::vector<double> heights((size_t)terrainGridSize*terrainGridSize);
 	for (int z = 0; z < terrainGridSize; ++z) {
 		for (int x = 0; x < terrainGridSize; ++x) {
-			double worldX = (x - terrainGridSize / 2.0) * terrainVertexSpacing;
-			double worldZ = (z - terrainGridSize / 2.0) * terrainVertexSpacing;
+			double worldX = chunkWorldX + x * terrainVertexSpacing;
+			double worldZ = chunkWorldZ + z * terrainVertexSpacing;
 			// TODO: USE SEVERAL OCTAVES OF NOISE TO GET MORE REALISTIC TERRAIN
 			double h = pow(fractalNoise2D(worldX * terrainFrequency, worldZ * terrainFrequency, noiseOctaveN, 0.5) * terrainHeightScale,4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
 			heights[z * terrainGridSize + x] = h;
@@ -588,8 +603,8 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 		for (int x = 0; x < terrainGridSize; ++x) {
 			double h = heights[z * terrainGridSize + x];
 
-			double worldX = (x - terrainGridSize / 2.0) * terrainVertexSpacing;
-			double worldZ = (z - terrainGridSize / 2.0) * terrainVertexSpacing;
+			double worldX = x * terrainVertexSpacing;
+			double worldZ = z * terrainVertexSpacing;
 
 			// Calculate normals using central differences
 			double heightL = (x > 0) ? heights[z * terrainGridSize + (x - 1)] : h;
