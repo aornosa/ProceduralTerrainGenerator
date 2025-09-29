@@ -322,9 +322,9 @@ int main() {
 
 			glm::mat4 model = glm::mat4(1.0f);
 			model = glm::translate(model, glm::vec3(
-				chunk.position.x * terrainGridSize * terrainVertexSpacing,
-				0.0f,
-				chunk.position.y * terrainGridSize * terrainVertexSpacing
+				chunk.position.x * (terrainGridSize-1) * terrainVertexSpacing,
+				0.0f,			  
+				chunk.position.y * (terrainGridSize-1) * terrainVertexSpacing
 			));
 			GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
 			if (modelLoc >= 0)
@@ -579,12 +579,14 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 	vertices.clear();
 	indices.clear();
 
+	int meshSize = terrainGridSize + 1;
+
 	vertices.reserve(terrainGridSize * terrainGridSize * 8);
 	indices.reserve((terrainGridSize - 1) * (terrainGridSize - 1) * 6);
 
 	// Compute world offset of this chunk
-	double chunkWorldX = chunkPos.x * terrainGridSize * terrainVertexSpacing;
-	double chunkWorldZ = chunkPos.y * terrainGridSize * terrainVertexSpacing;
+	double chunkWorldX = chunkPos.x * (terrainGridSize-1) * terrainVertexSpacing;
+	double chunkWorldZ = chunkPos.y * (terrainGridSize-1) * terrainVertexSpacing;
 
 	// Precompute heights
 	std::vector<double> heights((size_t)terrainGridSize*terrainGridSize);
