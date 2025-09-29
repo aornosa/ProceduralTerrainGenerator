@@ -171,7 +171,6 @@ double slerp(double a, double b, double t);
 
 
 
-
 // TESTING
 void genCube(std::vector<GLfloat>& vertices, std::vector<GLuint>& indices); // Generate a cube mesh for testing purposes
 
@@ -245,19 +244,6 @@ int main() {
 	std::vector<long long> visibleChunks; // List of currently loaded chunk keys
 	//std::vector<Chunk*> visibleChunks;
 
-	/*REMOVE*/
-	// Declare terrain data structures
-	std::vector<GLfloat> terrainVertices;
-	std::vector<GLuint> terrainIndices;
-
-	GLuint terrainVBO, terrainVAO, terrainEBO; // Vertex Buffer Object, Vertex Array Object, Element Buffer Object
-
-	// Generate terrain mesh (Call only once per chunk)
-	//generateTerrainMesh(terrainVertices, terrainIndices, perlinNoise2D);
-
-	// Create buffer and array objects for terrain
-	CreateBufferArrayObjects(terrainVBO, terrainVAO, terrainEBO, terrainVertices.data(), terrainVertices.size(), terrainIndices.data(), terrainIndices.size());
-
 	// Cube for testing
 	std::vector<GLfloat> cubeVertices;
 	std::vector<GLuint> cubeIndices;
@@ -271,14 +257,12 @@ int main() {
 	GLuint whiteTexture = 0;
 	glGenTextures(1, &whiteTexture);
 	glBindTexture(GL_TEXTURE_2D, whiteTexture);
-	unsigned char whitePixel[3] = { 255, 255, 255 };
+	unsigned char whitePixel[3] = { 80, 255, 100 };
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, whitePixel);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	
-
-	updateVisibleChunks(chunkMap, visibleChunks, cameraPos, renderDistance); // Initial update of visible chunks based on camera position and render distance
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -335,14 +319,6 @@ int main() {
 
 			glBindVertexArray(0);
 		}
-
-
-
-
-		glBindVertexArray(terrainVAO);
-		glDrawElements(GL_TRIANGLES, (GLsizei)terrainIndices.size(), GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
-
 
 		// Swap buffers and poll events (Frame main loop)
 		glfwSwapBuffers(window);
