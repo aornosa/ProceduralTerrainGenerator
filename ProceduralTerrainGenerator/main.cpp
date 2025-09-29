@@ -96,7 +96,7 @@ float sensitivity = 0.1f;		// Mouse sensitivity
 
 
 // TERRAIN SETTINGS
-const int terrainGridSize = 128;
+const int terrainGridSize = 64;
 const float terrainVertexSpacing = 1.f;		// Only applies to X and Z axis
 const float terrainHeightScale = 15.f;		// Scale height (Y axis)
 const float terrainFrequency = 0.0005f;		// Frequency of the noise function
@@ -104,7 +104,7 @@ const int noiseOctaveN = 6;					// Number of noise layers
 const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 
 // RENDER SETTINGS
-const int renderDistance = 3;			// Render distance in chunks
+const int renderDistance = 6;			// Render distance in chunks
 
 // OBJECT DECLARATIONS
 class Chunk;
@@ -242,17 +242,16 @@ int main() {
 
 	std::unordered_map<long long, Chunk> chunkMap; // Map to store chunks by their position key
 	std::vector<long long> visibleChunks; // List of currently loaded chunk keys
-	//std::vector<Chunk*> visibleChunks;
 
 	// Cube for testing
 	std::vector<GLfloat> cubeVertices;
 	std::vector<GLuint> cubeIndices;
 	genCube(cubeVertices, cubeIndices);
 
-
 	GLuint cubeVBO = 0, cubeVAO = 0, cubeEBO = 0;
 	CreateBufferArrayObjects(cubeVBO, cubeVAO, cubeEBO, cubeVertices.data(), cubeVertices.size(), cubeIndices.data(), cubeIndices.size());
-	/*REMOVE*/
+
+
 	// Create a simple 1x1 white texture so shader sampling is valid (CHANGE FOR TEXTURE GENERATION/SAMPLING)
 	GLuint whiteTexture = 0;
 	glGenTextures(1, &whiteTexture);
@@ -291,11 +290,6 @@ int main() {
 		glBindVertexArray(cubeVAO);
 		glDrawElements(GL_TRIANGLES, (GLsizei)cubeIndices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
-		
-		// NEEDS LIGHT, TEXTURE AND MODEL MATRIX WHEN REFACTORED INTO FUNCTION
-		glm::mat4 terrainModel = glm::mat4(1.0f);
-		modelLoc = glGetUniformLocation(shaderProgram, "model");
-		if (modelLoc >= 0) glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(terrainModel));
 
 		// Render visible chunks
 		std::cout << "Visible Chunks: " << visibleChunks.size() << "\n";
