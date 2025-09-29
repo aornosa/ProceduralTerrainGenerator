@@ -11,6 +11,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <unordered_map>
 
 // SHADER SOURCES
 // Basic vertex shader
@@ -95,13 +96,18 @@ float sensitivity = 0.1f;		// Mouse sensitivity
 
 
 // TERRAIN SETTINGS
-const int terrainGridSize = 2*1024;
+const int terrainGridSize = 128;
 const float terrainVertexSpacing = 1.f;		// Only applies to X and Z axis
 const float terrainHeightScale = 15.f;		// Scale height (Y axis)
 const float terrainFrequency = 0.0005f;		// Frequency of the noise function
 const int noiseOctaveN = 6;					// Number of noise layers
 const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 
+// RENDER SETTINGS
+const int renderDistance = 1;			// Render distance in chunks
+
+// OBJECT DECLARATIONS
+class Chunk;
 
 // FUNCTION DECLARATIONS
 GLFWwindow* initOpenGL();
@@ -132,7 +138,13 @@ Layered Perlin noise function to create fractal noise.
 Combines multiple octaves of Perlin noise to produce more complex and natural-looking terrain features.
 */
 double fractalNoise2D(double x, double y, int octaves, double persistence); // Generate fractal noise by combining multiple octaves of Perlin noise
+// TODO: REFACTOR NOISE FUNCTION INPUT
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double));	// Generate terrain mesh using Perlin noise
+
+
+// TERRAIN RENDERING
+void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<Chunk*>& visibleChunks, glm::vec3 cameraPos, int renderDistance);
+
 
 // MATH
 double clamp(double value, double min, double max);
@@ -164,11 +176,76 @@ double slerp(double a, double b, double t);
 void genCube(std::vector<GLfloat>& vertices, std::vector<GLuint>& indices); // Generate a cube mesh for testing purposes
 
 
+
+// OBJECT CLASSES
+class Chunk {
+public:
+	// Properties
+	glm::vec2 position;					// Position of the chunk in world space (X, Z)
+	// CPU side
+	std::vector<GLfloat> vertices;		// Vertex data (positions, normals, texture coordinates)
+	std::vector<GLuint> indices;		// Index data for element drawing
+	// GPU side
+	GLuint VBO = 0, VAO = 0, EBO = 0;	// OpenGL buffer and array objects
+
+	bool isInitialized;					// Flag to check if the chunk has been initialized
+	bool isActive = false;				// Flag to check if the chunk is active (within render distance)
+	Chunk() : position(glm::vec2(0.0f)), isInitialized(false) {}
+	Chunk(glm::vec2 pos) : position(pos), isInitialized(false) {}
+
+	~Chunk() {
+		if (isInitialized) {
+			glDeleteVertexArrays(1, &VAO);
+			glDeleteBuffers(1, &VBO);
+			glDeleteBuffers(1, &EBO);
+		}
+	}
+
+	void initialize() {
+		generateTerrainMesh(vertices, indices, perlinNoise2D);
+		CreateBufferArrayObjects(VBO, VAO, EBO, vertices.data(), vertices.size(), indices.data(), indices.size());
+		isInitialized = true;
+		isActive = true;
+	}
+
+	void load() {
+		if (isActive) return; // Already active
+		if (!isInitialized) {
+			initialize();
+		}
+		isActive = true;
+	}
+
+	void unload() {
+		if (!isActive) return; // Already inactive
+		isActive = false;
+	}
+
+	static long long hashCoords(int x, int y) {
+		return (static_cast<long long>(static_cast<uint32_t>(x)) << 32) |
+			static_cast<uint32_t>(y);
+	}
+
+	long long hash() const {
+		return hashCoords(static_cast<int>(position.x), static_cast<int>(position.y));
+	}
+	
+	int camToChunkCoord (int coord) const {
+		return static_cast<int>(floor((coord) / (terrainGridSize * terrainVertexSpacing)));
+	}
+};
+
+
 int main() {
 	// Initialize OpenGL and create window
 	GLFWwindow* window = initOpenGL();
 	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource, fragmentShaderSource);
 
+	std::unordered_map<long long, Chunk> chunkMap; // Map to store chunks by their position key
+	std::vector<long long> loadedChunkKeys; // List of currently loaded chunk keys
+	std::vector<Chunk*> visibleChunks;
+
+	/*REMOVE*/
 	// Declare terrain data structures
 	std::vector<GLfloat> terrainVertices;
 	std::vector<GLuint> terrainIndices;
@@ -199,11 +276,14 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
+	/*REMOVE*/
+
 
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		UpdateCamera(shaderProgram, cameraPos);
+		updateVisibleChunks(chunkMap, visibleChunks, cameraPos, renderDistance); // Update visible chunks based on camera position and render distance
 
 		// TESTING RENDER CUBE
 		glUseProgram(shaderProgram);
@@ -232,6 +312,20 @@ int main() {
 		glm::mat4 terrainModel = glm::mat4(1.0f);
 		modelLoc = glGetUniformLocation(shaderProgram, "model");
 		if (modelLoc >= 0) glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(terrainModel));
+
+		// Render visible chunks
+		std::cout << "Visible Chunks: " << visibleChunks.size() << "\n";
+		for (Chunk *chunk : visibleChunks) {
+			if (!chunk->isInitialized) continue; // Safety check (skip if chunk not loaded yet)
+
+			glBindVertexArray(chunk->VAO);
+			glDrawElements(GL_TRIANGLES, (GLsizei)chunk->indices.size(), GL_UNSIGNED_INT, 0);
+
+			glBindVertexArray(0);
+		}
+
+
+
 
 		glBindVertexArray(terrainVAO);
 		glDrawElements(GL_TRIANGLES, (GLsizei)terrainIndices.size(), GL_UNSIGNED_INT, 0);
@@ -277,10 +371,8 @@ void CreateBufferArrayObjects(GLuint &VBO, GLuint &VAO, GLuint &EBO, const float
 	glEnableVertexAttribArray(2);																	// Enable texCoord attribute
 
 	glBindVertexArray(0); // Unbind VAO
-	/*
 	glBindBuffer(GL_ARRAY_BUFFER, 0); // Unbind VBO
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); // Unbind EBO
-	*/
 }
 void UpdateBufferArrayObjects(GLuint &VBO, GLuint &EBO, const float *vertices, size_t vertexCount, const GLuint *indices, size_t indexCount) {
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);														// Bind Vertex Buffer Object
@@ -555,6 +647,61 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 			indices.push_back(topLeft);
 			indices.push_back(bottomRight);
 			indices.push_back(topRight);
+		}
+	}
+}
+
+// TERRAIN RENDERING
+void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<Chunk*>& visibleChunks, glm::vec3 cameraPos, int renderDistance) {
+	// Determine current chunk coordinates based on camera position
+	int currentChunkX = (int)floor(cameraPos.x / (terrainGridSize * terrainVertexSpacing));
+	int currentChunkZ = (int)floor(cameraPos.z / (terrainGridSize * terrainVertexSpacing));
+
+	// Remove chunks that are no longer within render distance (O(n) due to vector structure)
+	visibleChunks.erase(
+		std::remove_if(visibleChunks.begin(), visibleChunks.end(),
+			[&](Chunk* chunk) {		// Lambda to check if chunk is outside render distance (captured chunk coords)
+				int dx = chunk->position.x - currentChunkX;
+				int dz = chunk->position.y - currentChunkZ;
+
+				// Calculate if chunk is outside render distance
+				if (dx*dx + dz*dz > renderDistance*renderDistance) {
+					chunk->isActive = false;	// Mark chunk as inactive
+					return true;				// Remove from visible chunks
+				}
+				return false;					// Keep in visible chunks
+			}
+		),
+		visibleChunks.end()
+	);
+
+	// Load new chunks within render distance
+	for (int dz = -renderDistance; dz <= renderDistance; ++dz) {
+		for (int dx = -renderDistance; dx <= renderDistance; ++dx) {
+			// Skip chunks outside circular render distance
+			if (dx * dx + dz * dz > renderDistance * renderDistance) continue; 
+
+			// Calculate current iteration chunk coordinates
+			int chunkX = currentChunkX + dx;
+			int chunkZ = currentChunkZ + dz;
+
+			// Generate unique key for chunk coordinates
+			long long chunkKey = Chunk::hashCoords(chunkX, chunkZ);
+
+			auto it = chunkMap.find(chunkKey);
+			if (it != chunkMap.end()) {
+				if (it->second.isActive) continue;
+				else {
+					it->second.load();
+					visibleChunks.push_back(&it->second);
+				}
+			}
+			else { // Create new chunk if it doesn't exist
+				Chunk newChunk = Chunk(glm::vec2(chunkX, chunkZ));
+				newChunk.load();
+				chunkMap[chunkKey] = newChunk;
+				visibleChunks.push_back(&chunkMap[chunkKey]);
+			}
 		}
 	}
 }
