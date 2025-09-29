@@ -120,13 +120,11 @@ const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 // SKY SETTINGS
 const glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
 
-const float fogDensity = 0.0005;
-//const float fogMinDistance; // Unused
-//const float fogMaxDistance; // Unused
+const float fogDensity = 0.001;
 const glm::vec3 fogColor = { 0.4, 0.65, 1.0 };
 
 // RENDER SETTINGS
-const int renderDistance = 10;			// Render distance in chunks
+const int renderDistance = 16;			// Render distance in chunks
 
 // OBJECT DECLARATIONS
 class Chunk;
@@ -323,10 +321,8 @@ int main() {
 		glBindVertexArray(0);
 
 		// Render visible chunks
-		//std::cout << "Visible Chunks: " << visibleChunks.size() << "\n";
 		for (long long keys : visibleChunks) {
 			Chunk& chunk = chunkMap.at(keys);
-			//std::cout << "Rendering Chunk at: (" << chunk.position.x << ", " << chunk.position.y << ")\n";
 			if (!chunk.isInitialized) continue; // Safety check (skip if chunk not loaded yet)
 
 			glm::mat4 model = glm::mat4(1.0f);
