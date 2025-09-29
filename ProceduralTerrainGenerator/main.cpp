@@ -120,8 +120,13 @@ const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 // SKY SETTINGS
 const glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
 
+const float fogDensity = 0.0005;
+//const float fogMinDistance; // Unused
+//const float fogMaxDistance; // Unused
+const glm::vec3 fogColor = { 0.4, 0.65, 1.0 };
+
 // RENDER SETTINGS
-const int renderDistance = 6;			// Render distance in chunks
+const int renderDistance = 10;			// Render distance in chunks
 
 // OBJECT DECLARATIONS
 class Chunk;
@@ -282,6 +287,13 @@ int main() {
 	// Link shader program
 	glUseProgram(shaderProgram);
 
+	// Set fog values
+	GLint fogDensityLoc = glGetUniformLocation(shaderProgram, "fogDensity");
+	if (fogDensityLoc >= 0) glUniform1f(fogDensityLoc, fogDensity);
+
+	GLint fogColorLoc = glGetUniformLocation(shaderProgram, "fogColor");
+	if (fogColorLoc >= 0) glUniform3f(fogColorLoc, fogColor.r, fogColor.g, fogColor.b);
+
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -311,10 +323,10 @@ int main() {
 		glBindVertexArray(0);
 
 		// Render visible chunks
-		std::cout << "Visible Chunks: " << visibleChunks.size() << "\n";
+		//std::cout << "Visible Chunks: " << visibleChunks.size() << "\n";
 		for (long long keys : visibleChunks) {
 			Chunk& chunk = chunkMap.at(keys);
-			std::cout << "Rendering Chunk at: (" << chunk.position.x << ", " << chunk.position.y << ")\n";
+			//std::cout << "Rendering Chunk at: (" << chunk.position.x << ", " << chunk.position.y << ")\n";
 			if (!chunk.isInitialized) continue; // Safety check (skip if chunk not loaded yet)
 
 			glm::mat4 model = glm::mat4(1.0f);
@@ -344,6 +356,9 @@ void UpdateCamera(GLuint shaderProgram, glm::vec3 cameraPos) {
 	glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 3000.0f);
 	glUseProgram(shaderProgram);
+	GLint cameraPosLoc = glGetUniformLocation(shaderProgram, "cameraPos");
+	if (cameraPosLoc >= 0) glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+
 	GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
 	GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
