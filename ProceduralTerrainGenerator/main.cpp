@@ -121,7 +121,7 @@ const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
 const glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
 
 const float fogDensity = 0.001;
-const glm::vec3 fogColor = { 0.4, 0.65, 1.0 };
+const glm::vec3 fogColor = { 0.55f, 0.75f, 1.0f };
 
 // RENDER SETTINGS
 const int renderDistance = 16;			// Render distance in chunks
@@ -163,7 +163,7 @@ void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &in
 
 
 // TERRAIN RENDERING
-void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector</*Chunk**/long long>& visibleChunks, glm::vec3 cameraPos, int renderDistance);
+void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<long long>& visibleChunks, glm::vec3 cameraPos, int renderDistance);
 
 
 // MATH
@@ -670,7 +670,7 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 }
 
 // TERRAIN RENDERING
-void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<long long/*Chunk* */>& visibleChunks, glm::vec3 cameraPos, int renderDistance) {
+void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<long long>& visibleChunks, glm::vec3 cameraPos, int renderDistance) {
 	// Determine current chunk coordinates based on camera position
 	int currentChunkX = (int)floor(cameraPos.x / (terrainGridSize * terrainVertexSpacing));
 	int currentChunkZ = (int)floor(cameraPos.z / (terrainGridSize * terrainVertexSpacing));

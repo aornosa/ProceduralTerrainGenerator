@@ -13,16 +13,34 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Archivos de sombreado">
+      <UniqueIdentifier>{85b01753-e187-4371-95a0-c9f5c0b93aa3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Archivos de sombreado\Generic">
+      <UniqueIdentifier>{d12a6fa4-ad33-41bb-a6da-9828492d2fc3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Archivos de sombreado\LOD">
+      <UniqueIdentifier>{f05bd2b6-335f-4df8-a9d9-de8261e7eb46}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="generic.frag">
+      <Filter>Archivos de sombreado\Generic</Filter>
+    </None>
+    <None Include="generic.vert">
+      <Filter>Archivos de sombreado\Generic</Filter>
+    </None>
+    <None Include="LOD_TesselationControl.tesc">
+      <Filter>Archivos de sombreado\LOD</Filter>
+    </None>
+    <None Include="LOD_TesselationEvaluation.tese">
+      <Filter>Archivos de sombreado\LOD</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="SystemExampleLinks.txt" />
   </ItemGroup>
 </Project>
