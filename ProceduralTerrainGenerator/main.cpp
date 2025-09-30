@@ -85,6 +85,78 @@ const char* fragmentShaderSource = R"glsl(
 		FragColor = vec4(result, 1.0);
 })glsl";
 
+// Tesselation control shader
+const char* tesselationControlShaderSource = R"glsl(
+# version 400 core
+layout(vertices = 4) out;	// Pass 4 vertex per patch
+
+const float MIN_TESS_LEVEL = 1.0;
+const float MAX_TESS_LEVEL = 64.0;
+
+
+uniform vec3 cameraPos;		// Camera position in world space
+
+void main() {
+	gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+
+	// Compute center
+	vec3 p0 = gl_in[0].gl_Position.xyz;
+	vec3 p2 = gl_in[2].gl_Position.xyz;
+	vec3 center = (p0 + p2) * 0.5;
+
+	// Compute distance to camera
+	float dist = distance(center, cameraPos);
+
+	// Compute tessellation level based on distance (simple linear)
+	float tessLevel = clamp(MAX_TESS_LEVEL / dist, MIN_TESS_LEVEL, MAX_TESS_LEVEL);
+
+	// Set tessellation levels for inner and outer edges
+	gl_TessLevelInner[0] = tessLevel;
+	gl_TessLevelInner[1] = tessLevel;
+	
+	// For quads, we have 4 outer levels
+	gl_TessLevelOuter[0] = tessLevel;
+	gl_TessLevelOuter[1] = tessLevel;
+	gl_TessLevelOuter[2] = tessLevel;
+	gl_TessLevelOuter[3] = tessLevel;
+})glsl";
+
+// Tesselation evaluation shader
+const char* tesselationEvaluationShaderSource = R"glsl(#version 400 core
+layout(quads, equal_spacing, ccw) in;
+
+in vec3 FragPos[];
+in vec3 Normal[];
+in vec2 TexCoord[];
+
+out vec3 outFragPos;
+out vec3 outNormal;
+out vec2 outTexCoord;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main() {
+    // Interpolate attributes across the quad
+    vec3 p0 = FragPos[0];
+    vec3 p1 = FragPos[1];
+    vec3 p2 = FragPos[2];
+    vec3 p3 = FragPos[3];
+
+    float u = gl_TessCoord.x;
+    float v = gl_TessCoord.y;
+
+    vec3 pos = mix(mix(p0, p1, u), mix(p3, p2, u), v);
+
+    outFragPos = pos;
+    outNormal = normalize(mix(mix(Normal[0], Normal[1], u), mix(Normal[3], Normal[2], u), v));
+    outTexCoord = mix(mix(TexCoord[0], TexCoord[1], u), mix(TexCoord[3], TexCoord[2], u), v);
+
+    gl_Position = projection * view * model * vec4(pos, 1.0);
+})glsl";
+
+
 // MATH CONSTANTS
 const double PI = 3.14159265358979323846;
 
@@ -124,7 +196,7 @@ const float fogDensity = 0.001;
 const glm::vec3 fogColor = { 0.55f, 0.75f, 1.0f };
 
 // RENDER SETTINGS
-const int renderDistance = 16;			// Render distance in chunks
+const int renderDistance = 6;			// Render distance in chunks (Default: 16)
 
 // OBJECT DECLARATIONS
 class Chunk;
@@ -138,7 +210,7 @@ void CreateBufferArrayObjects(GLuint& VBO, GLuint& VAO, GLuint& EBO, const float
 void UpdateBufferArrayObjects(GLuint& VBO, GLuint& EBO, const float* vertices, size_t vertexCount, const GLuint* indices, size_t indexCount); // Update existing Vertex Buffer Object with new data from vertices array (Add new chunks)
 
 // SHADING
-GLuint CompileShaderProgram(const char* vertexSource, const char* fragmentSource); // Compile and link vertex and fragment shaders into a shader program
+GLuint CompileShaderProgram(const char* vertexSource, const char* fragmentSource, const char* tesselationControlSource, const char* tesselationEvaluationSource); // Compile and link vertex and fragment shaders into a shader program
 
 // CALLBACKS
 void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods);	// Callback for keyboard input
@@ -258,7 +330,7 @@ public:
 int main() {
 	// Initialize OpenGL and create window
 	GLFWwindow* window = initOpenGL();
-	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource, fragmentShaderSource);
+	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource, fragmentShaderSource, tesselationControlShaderSource, tesselationEvaluationShaderSource);
 
 	std::unordered_map<long long, Chunk> chunkMap; // Map to store chunks by their position key
 	std::vector<long long> visibleChunks; // List of currently loaded chunk keys
@@ -336,7 +408,7 @@ int main() {
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
 			glBindVertexArray(chunk.VAO);
-			glDrawElements(GL_TRIANGLES, (GLsizei)chunk.indices.size(), GL_UNSIGNED_INT, 0);
+			glDrawElements(GL_PATCHES, (GLsizei)chunk.indices.size(), GL_UNSIGNED_INT, 0);
 
 			glBindVertexArray(0);
 		}
@@ -395,7 +467,7 @@ void UpdateBufferArrayObjects(GLuint &VBO, GLuint &EBO, const float *vertices, s
 }
 
 // SHADING
-GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource) {
+GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource, const char *tesselationControlSource, const char *tesselationEvaluationSource) {
 	GLint success;												// Check for compilation errors
 
 	// Vertex Shader
@@ -410,6 +482,31 @@ GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource
 		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
 		std::cerr << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
 	}
+
+	// Tesselation Control Shader
+	GLuint tesselationControlShader = glCreateShader(GL_TESS_CONTROL_SHADER);	// Create tesselation control shader
+	glShaderSource(tesselationControlShader, 1, &tesselationControlSource, NULL); // Attach tesselation control shader source code
+	glCompileShader(tesselationControlShader);						// Compile tesselation control shader
+
+	glGetShaderiv(tesselationControlShader, GL_COMPILE_STATUS, &success); // Check for compilation errors
+	if (!success) {
+		GLchar infoLog[512];
+		glGetShaderInfoLog(tesselationControlShader, 512, NULL, infoLog);
+		std::cerr << "ERROR::SHADER::TESSELATION_CONTROL::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+
+	// Tesselation Evaluation Shader
+	GLuint tesselationEvaluationShader = glCreateShader(GL_TESS_EVALUATION_SHADER); // Create tesselation evaluation shader
+	glShaderSource(tesselationEvaluationShader, 1, &tesselationEvaluationSource, NULL); // Attach tesselation evaluation shader source code
+	glCompileShader(tesselationEvaluationShader);				// Compile tesselation evaluation shader
+
+	glGetShaderiv(tesselationEvaluationShader, GL_COMPILE_STATUS, &success); // Check for compilation errors
+	if (!success) {
+		GLchar infoLog[512];
+		glGetShaderInfoLog(tesselationEvaluationShader, 512, NULL, infoLog);
+		std::cerr << "ERROR::SHADER::TESSELATION_EVALUATION::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+
 
 	// Fragment Shader
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);	// Create fragment shader
