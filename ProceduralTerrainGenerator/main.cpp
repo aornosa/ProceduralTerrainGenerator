@@ -819,6 +819,9 @@ GLFWwindow* initOpenGL()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);					// Set blending function (transparency)
 	glClearColor(skyColor.x, skyColor.y, skyColor.z, skyColor.w);		// Set clear color (sky blue)
 
+	glPatchParameteri(GL_PATCH_VERTICES, 4); // Set number of vertices per patch (tessellation)
+	//glDrawArrays(GL_PATCHES, 0, 4); // Draw patches (tessellation)
+
 	glfwShowWindow(window); // Show window
 	
 	return window;
