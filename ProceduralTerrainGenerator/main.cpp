@@ -210,6 +210,7 @@ void CreateBufferArrayObjects(GLuint& VBO, GLuint& VAO, GLuint& EBO, const float
 void UpdateBufferArrayObjects(GLuint& VBO, GLuint& EBO, const float* vertices, size_t vertexCount, const GLuint* indices, size_t indexCount); // Update existing Vertex Buffer Object with new data from vertices array (Add new chunks)
 
 // SHADING
+const char* LoadShaderSource(const char* filePath); // Load shader source code from file
 GLuint CompileShaderProgram(const char* vertexSource, const char* fragmentSource, const char* tesselationControlSource, const char* tesselationEvaluationSource); // Compile and link vertex and fragment shaders into a shader program
 
 // CALLBACKS
@@ -330,6 +331,12 @@ public:
 int main() {
 	// Initialize OpenGL and create window
 	GLFWwindow* window = initOpenGL();
+	/*
+	const char* vertexShaderSource = LoadShaderSource("generic.vert");
+	const char* fragmentShaderSource = LoadShaderSource("generic.frag");
+	const char* tesselationControlShaderSource = LoadShaderSource("LOD_TesselationControl.tesc");
+	const char* tesselationEvaluationShaderSource = LoadShaderSource("LOD_TesselationEvaluation.tese");
+	*/
 	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource, fragmentShaderSource, tesselationControlShaderSource, tesselationEvaluationShaderSource);
 
 	std::unordered_map<long long, Chunk> chunkMap; // Map to store chunks by their position key
@@ -467,6 +474,22 @@ void UpdateBufferArrayObjects(GLuint &VBO, GLuint &EBO, const float *vertices, s
 }
 
 // SHADING
+const char* LoadShaderSource(const char *filePath) {
+	FILE* file;
+	fopen_s(&file, filePath, "r");
+	if (!file) {
+		std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " << filePath << std::endl;
+		return nullptr;
+	}
+	fseek(file, 0, SEEK_END);
+	long length = ftell(file);
+	fseek(file, 0, SEEK_SET);
+	char* buffer = new char[length + 1];
+	fread(buffer, 1, length, file);
+	buffer[length] = '\0';
+	fclose(file);
+	return buffer;
+}
 GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource, const char *tesselationControlSource, const char *tesselationEvaluationSource) {
 	GLint success;												// Check for compilation errors
 
@@ -525,6 +548,8 @@ GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource
 	// Shader Program
 	GLuint shaderProgram = glCreateProgram();					// Create shader program
 	glAttachShader(shaderProgram, vertexShader);				// Attach vertex shader to shader program
+	glAttachShader(shaderProgram, tesselationControlShader);
+	glAttachShader(shaderProgram, tesselationEvaluationShader);
 	glAttachShader(shaderProgram, fragmentShader);				// Attach fragment shader to shader program
 	glLinkProgram(shaderProgram);								// Link shader program
 
