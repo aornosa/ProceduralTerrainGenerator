@@ -207,14 +207,6 @@ int main() {
 	std::unordered_map<long long, Chunk> chunkMap; // Map to store chunks by their position key
 	std::vector<long long> visibleChunks; // List of currently loaded chunk keys
 
-	// Cube for testing
-	std::vector<GLfloat> cubeVertices;
-	std::vector<GLuint> cubeIndices;
-	genCube(cubeVertices, cubeIndices);
-
-	GLuint cubeVBO = 0, cubeVAO = 0, cubeEBO = 0;
-	CreateBufferArrayObjects(cubeVBO, cubeVAO, cubeEBO, cubeVertices.data(), cubeVertices.size(), cubeIndices.data(), cubeIndices.size());
-
 
 	// Create a simple 1x1 white texture so shader sampling is valid (CHANGE FOR TEXTURE GENERATION/SAMPLING)
 	GLuint whiteTexture = 0;
@@ -253,16 +245,6 @@ int main() {
 		GLint viewLocP = glGetUniformLocation(shaderProgram, "viewPos");
 		if (viewLocP >= 0) glUniform3f(viewLocP, cameraPos.x, cameraPos.y, cameraPos.z);
 
-		// Model matrix for the cube
-		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, 1.0f, 0.0f)); // lift slightly so it's visible above y=0
-		model = glm::scale(model, glm::vec3(2.0f)); // make it a bit bigger
-		GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-		if (modelLoc >= 0) glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
-		glBindVertexArray(cubeVAO);
-		glDrawElements(GL_TRIANGLES, (GLsizei)cubeIndices.size(), GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
 
 		// Render visible chunks
 		for (long long keys : visibleChunks) {
