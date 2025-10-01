@@ -362,9 +362,7 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	
-	// Link shader program
-	glUseProgram(shaderProgram);
+
 
 	// Set fog values
 	GLint fogDensityLoc = glGetUniformLocation(shaderProgram, "fogDensity");
@@ -432,13 +430,16 @@ int main() {
 void UpdateCamera(GLuint shaderProgram, glm::vec3 cameraPos) {
 	glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 3000.0f);
+	
 	glUseProgram(shaderProgram);
+	
 	GLint cameraPosLoc = glGetUniformLocation(shaderProgram, "cameraPos");
 	if (cameraPosLoc >= 0) glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
 
 	GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-	GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+	GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 }
 void CreateBufferArrayObjects(GLuint &VBO, GLuint &VAO, GLuint &EBO, const float *vertices, size_t vertexCount, const GLuint *indices, size_t indexCount) {
@@ -560,8 +561,10 @@ GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource
 	}
 
 	// Clean up (Shaders already linked in program)
-	glDeleteShader(vertexShader);	// Delete vertex shader
-	glDeleteShader(fragmentShader);	// Delete fragment shader
+	glDeleteShader(vertexShader);					// Delete vertex shader
+	glDeleteShader(fragmentShader);					// Delete fragment shader
+	glDeleteShader(tesselationControlShader);		// Delete tesselation control shader
+	glDeleteShader(tesselationEvaluationShader);	// Delete tesselation evaluation shader
 
 	return shaderProgram;			// Return shader program ID
 }
@@ -780,10 +783,10 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 			indices.push_back(topLeft);
 			indices.push_back(bottomLeft);
 			indices.push_back(bottomRight);
-
+			/*
 			//T2
 			indices.push_back(topLeft);
-			indices.push_back(bottomRight);
+			indices.push_back(bottomRight);*/
 			indices.push_back(topRight);
 		}
 	}

@@ -2,21 +2,35 @@
 layout(vertices = 4) out;	// Pass 4 vertex per patch
 
 const float MIN_TESS_LEVEL = 1.0;
-const float MAX_TESS_LEVEL = 64.0;
+const float MAX_TESS_LEVEL = 16.0;
+const float DIST_TESS_FACTOR = 0.1; // Adjust to control tessellation density
 
 
 uniform vec3 cameraPos;		// Camera position in world space
 
+in vec3 FragPos[];    // From vertex shader
+in vec3 Normal[];
+in vec2 TexCoord[];
+
+out vec3 tcsFragPos[];
+out vec3 tcsNormal[];
+out vec2 tcsTexCoord[];
+
 void main() {
 	gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
 
+	// Pass through vertex attributes
+    tcsFragPos[gl_InvocationID] = FragPos[gl_InvocationID];
+    tcsNormal[gl_InvocationID] = Normal[gl_InvocationID];
+    tcsTexCoord[gl_InvocationID] = TexCoord[gl_InvocationID];
+
 	// Compute center
-	vec3 p0 = gl_in[0].gl_Position.xyz;
-	vec3 p2 = gl_in[2].gl_Position.xyz;
+	vec3 p0 = FragPos[0].xyz;
+	vec3 p2 = FragPos[2].xyz;
 	vec3 center = (p0 + p2) * 0.5;
 
 	// Compute distance to camera
-	float dist = distance(center, cameraPos);
+	float dist = distance(center, cameraPos) * DIST_TESS_FACTOR;
 
 	// Compute tessellation level based on distance (simple linear)
 	float tessLevel = clamp(MAX_TESS_LEVEL / dist, MIN_TESS_LEVEL, MAX_TESS_LEVEL);
@@ -25,7 +39,6 @@ void main() {
 	gl_TessLevelInner[0] = tessLevel;
 	gl_TessLevelInner[1] = tessLevel;
 	
-	// For quads, we have 4 outer levels
 	gl_TessLevelOuter[0] = tessLevel;
 	gl_TessLevelOuter[1] = tessLevel;
 	gl_TessLevelOuter[2] = tessLevel;
