@@ -1,4 +1,4 @@
-# version 400 core
+#version 400 core
 layout(vertices = 4) out;	// Pass 4 vertex per patch
 
 const float MIN_TESS_LEVEL = 1.0;

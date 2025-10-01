@@ -1,4 +1,4 @@
-# version 400 core
+#version 400 core
 layout(quads, equal_spacing, ccw) in;
 
 // Input per-vertex data (from vertex shader)
