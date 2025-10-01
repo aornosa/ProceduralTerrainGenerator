@@ -1,5 +1,5 @@
 #version 400 core
-layout(isolines, equal_spacing, ccw) in;
+layout(quads, equal_spacing, ccw) in;
 
 // Input per-vertex data (from vertex shader)
 uniform mat4 model;
@@ -13,9 +13,9 @@ in vec3 Normal[];
 in vec2 TexCoord[];
 
 // Pass to fragment shader
-out vec3 outFragPos;
-out vec3 outNormal;
-out vec2 outTexCoord;
+out vec3 tesFragPos;
+out vec3 tesNormal;
+out vec2 tesTexCoord;
 
 void main() {
     // Tessellation coordinates (u, v) in [0,1]
@@ -43,9 +43,9 @@ void main() {
     vec3 norm = normalize(mix(mix(n0, n1, u), mix(n3, n2, u), v));
     vec2 tex = mix(mix(t0, t1, u), mix(t3, t2, u), v);
 
-    outFragPos = pos;
-    outNormal = norm;
-    outTexCoord = tex;
+    tesFragPos = pos;
+    tesNormal = norm;
+    tesTexCoord = tex;
 
     gl_Position = projection * view * vec4(pos, 1.0);
 }

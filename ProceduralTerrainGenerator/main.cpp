@@ -45,12 +45,13 @@ float sensitivity = 0.1f;		// Mouse sensitivity
 
 
 // TERRAIN SETTINGS
-const int terrainGridSize = 64;
-const float terrainVertexSpacing = 1.f;		// Only applies to X and Z axis
-const float terrainHeightScale = 15.f;		// Scale height (Y axis)
-const float terrainFrequency = 0.0005f;		// Frequency of the noise function
-const int noiseOctaveN = 6;					// Number of noise layers
-const int seed = 12345;						// IMPLEMENT RANDOM SEEDING
+const int terrainGridSize = 16;								// Powers of 2. Will change terrain resolution but not size
+const float terrainVertexSpacing = 64/terrainGridSize;		// Only applies to X and Z axis
+const float terrainRenderResolution = 0.5;					// Render resolution (0.1 = 10% of vertices rendered, 1.0 = 100% of vertices rendered)
+const float terrainHeightScale = 15.f;						// Scale height (Y axis)
+const float terrainFrequency = 0.0005f;						// Frequency of the noise function
+const int noiseOctaveN = 6;									// Number of noise layers
+const int seed = 12345;										// IMPLEMENT RANDOM SEEDING
 
 // SKY SETTINGS
 const glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
@@ -219,12 +220,14 @@ int main() {
 	GLuint whiteTexture = 0;
 	glGenTextures(1, &whiteTexture);
 	glBindTexture(GL_TEXTURE_2D, whiteTexture);
-	unsigned char whitePixel[3] = { 80, 255, 100 };
+	unsigned char whitePixel[3] = { 45, 150, 75 };
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, whitePixel);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+	// Link shader program
+	glUseProgram(shaderProgram);
 
 	// Set fog values
 	GLint fogDensityLoc = glGetUniformLocation(shaderProgram, "fogDensity");
