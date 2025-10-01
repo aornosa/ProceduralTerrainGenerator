@@ -13,150 +13,12 @@
 #include <cmath>
 #include <algorithm>
 #include <unordered_map>
-/*
-// SHADER SOURCES
-// Basic vertex shader
-const char* vertexShaderSource = R"glsl(
-	#version 330 core
-	layout(location = 0) in vec3 aPos;		// Vertex position
-	layout(location = 1) in vec3 aNormal;	// Vertex normal
-	layout(location = 2) in vec2 aTexCoord; // Vertex texture coordinate
-	
-	out vec3 FragPos;
-	out vec3 Normal;
-	out vec2 TexCoord;
-	
-	uniform mat4 model;
-	uniform mat4 view;
-	uniform mat4 projection;
-	
-	void main() {
-		FragPos = vec3(model * vec4(aPos, 1.0));
-		Normal = mat3(transpose(inverse(model))) * aNormal;
-		TexCoord = aTexCoord;
-		gl_Position = projection * view * vec4(FragPos, 1.0);
-})glsl";
-//Basic fragment shader
-const char* fragmentShaderSource = R"glsl(
-	#version 330 core
-	out vec4 FragColor;
 
-	in vec3 FragPos;
-	in vec3 Normal;
-	in vec2 TexCoord;
-
-	uniform vec3 lightPos;
-	uniform vec3 viewPos;
-	uniform sampler2D texture1;
-
-	// Camera and fog uniforms
-	uniform vec3 cameraPos;
-	uniform vec3 fogColor = vec3(0.0, 0.0, 0.0);
-	uniform float fogDensity = 0.0;
-	uniform float maxFogDistance;
-	uniform float minFogDistance;
-
-	void main() {
-		// Ambient Lighting
-		float ambientStrength = 0.3;
-		vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
-
-		// Diffuse Lighting
-		vec3 norm = normalize(Normal);
-		vec3 lightDir = normalize(lightPos - FragPos);
-		float diff = max(dot(norm, lightDir), 0.0);
-		vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
-
-		// Specular Lighting
-		float specularStrength = 0.5;
-		vec3 viewDir = normalize(viewPos - FragPos);
-		vec3 reflectDir = reflect(-lightDir, norm);
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
-		vec3 specular = specularStrength * spec * vec3(1.0, 1.0, 1.0);
-
-		vec3 result = (ambient + diffuse + specular) * texture(texture1, TexCoord).rgb;
-		
-		// Add fog
-		if(fogDensity > 0.0) {
-			float distance = length(FragPos - cameraPos);
-			float fogFactor = 1.0 - exp(-distance * fogDensity);
-			
-			result = mix(result, fogColor, fogFactor); 
-		}
-		FragColor = vec4(result, 1.0);
-})glsl";
-
-// Tesselation control shader
-const char* tesselationControlShaderSource = R"glsl(
-# version 400 core
-layout(vertices = 4) out;	// Pass 4 vertex per patch
-
-const float MIN_TESS_LEVEL = 1.0;
-const float MAX_TESS_LEVEL = 64.0;
-
-
-uniform vec3 cameraPos;		// Camera position in world space
-
-void main() {
-	gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
-
-	// Compute center
-	vec3 p0 = gl_in[0].gl_Position.xyz;
-	vec3 p2 = gl_in[2].gl_Position.xyz;
-	vec3 center = (p0 + p2) * 0.5;
-
-	// Compute distance to camera
-	float dist = distance(center, cameraPos);
-
-	// Compute tessellation level based on distance (simple linear)
-	float tessLevel = clamp(MAX_TESS_LEVEL / dist, MIN_TESS_LEVEL, MAX_TESS_LEVEL);
-
-	// Set tessellation levels for inner and outer edges
-	gl_TessLevelInner[0] = tessLevel;
-	gl_TessLevelInner[1] = tessLevel;
-	
-	// For quads, we have 4 outer levels
-	gl_TessLevelOuter[0] = tessLevel;
-	gl_TessLevelOuter[1] = tessLevel;
-	gl_TessLevelOuter[2] = tessLevel;
-	gl_TessLevelOuter[3] = tessLevel;
-})glsl";
-
-// Tesselation evaluation shader
-const char* tesselationEvaluationShaderSource = R"glsl(#version 400 core
-layout(quads, equal_spacing, ccw) in;
-
-in vec3 FragPos[];
-in vec3 Normal[];
-in vec2 TexCoord[];
-
-out vec3 outFragPos;
-out vec3 outNormal;
-out vec2 outTexCoord;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-void main() {
-    // Interpolate attributes across the quad
-    vec3 p0 = FragPos[0];
-    vec3 p1 = FragPos[1];
-    vec3 p2 = FragPos[2];
-    vec3 p3 = FragPos[3];
-
-    float u = gl_TessCoord.x;
-    float v = gl_TessCoord.y;
-
-    vec3 pos = mix(mix(p0, p1, u), mix(p3, p2, u), v);
-
-    outFragPos = pos;
-    outNormal = normalize(mix(mix(Normal[0], Normal[1], u), mix(Normal[3], Normal[2], u), v));
-    outTexCoord = mix(mix(TexCoord[0], TexCoord[1], u), mix(TexCoord[3], TexCoord[2], u), v);
-
-    gl_Position = projection * view * model * vec4(pos, 1.0);
-})glsl";
-*/
+// SHADER SOURCE PATHS
+const char* vertexShaderPath = "./generic.vert";
+const char* fragmentShaderPath = "./generic.frag";
+const char* tesselationControlShaderPath = "./LOD_TesselationControl.tesc";
+const char* tesselationEvaluationShaderPath = "./LOD_TesselationEvaluation.tese";
 
 // MATH CONSTANTS
 const double PI = 3.14159265358979323846;
@@ -197,7 +59,7 @@ const float fogDensity = 0.001;
 const glm::vec3 fogColor = { 0.55f, 0.75f, 1.0f };
 
 // RENDER SETTINGS
-const int renderDistance = 6;			// Render distance in chunks (Default: 16)
+const int renderDistance = 16;			// Render distance in chunks (Default: 16)
 
 // OBJECT DECLARATIONS
 class Chunk;
@@ -333,10 +195,10 @@ int main() {
 	// Initialize OpenGL and create window
 	GLFWwindow* window = initOpenGL();
 	
-	std::string vertexShaderSource = LoadShaderSource("./generic.vert");
-	std::string fragmentShaderSource = LoadShaderSource("./generic.frag");
-	std::string tesselationControlShaderSource = LoadShaderSource("./LOD_TesselationControl.tesc");
-	std::string tesselationEvaluationShaderSource = LoadShaderSource("./LOD_TesselationEvaluation.tese");
+	std::string vertexShaderSource = LoadShaderSource(vertexShaderPath);
+	std::string fragmentShaderSource = LoadShaderSource(fragmentShaderPath);
+	std::string tesselationControlShaderSource = LoadShaderSource(tesselationControlShaderPath);
+	std::string tesselationEvaluationShaderSource = LoadShaderSource(tesselationEvaluationShaderPath);
 	
 	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource.c_str(), fragmentShaderSource.c_str(),
 												tesselationControlShaderSource.c_str(), tesselationEvaluationShaderSource.c_str());
@@ -759,17 +621,17 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 		}
 	}
 
-	// Build indices for triangle strips 
+	// Build indices for patches
 	/*
-		The triangles are built getting a square of 4 vertices from the grid, dividing it into 2 triangles.
-		All triangles will have a shape like this:
+		The patches are built getting a square of 4 vertices from the grid.
+		All patches will have a shape like this:
 
 		(z, x)--(z+1,x+1)
-		   |  \      |
-		   |   \ T2  |
-		   |    \    |
-		   | T1  \   |
-		   |      \  |
+		   |         |
+		   |         |
+		   |         |
+		   |         |
+		   |         |
 		(z+1,x)--(z, x+1)
 	*/
 	for (int z = 0; z < terrainGridSize-1; ++z) {
@@ -779,14 +641,9 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 			GLuint bottomLeft = (z + 1) * terrainGridSize + x;
 			GLuint bottomRight = bottomLeft + 1;
 
-			//T1
 			indices.push_back(topLeft);
 			indices.push_back(bottomLeft);
 			indices.push_back(bottomRight);
-			/*
-			//T2
-			indices.push_back(topLeft);
-			indices.push_back(bottomRight);*/
 			indices.push_back(topRight);
 		}
 	}

@@ -3,7 +3,7 @@ layout(vertices = 4) out;	// Pass 4 vertex per patch
 
 const float MIN_TESS_LEVEL = 1.0;
 const float MAX_TESS_LEVEL = 16.0;
-const float DIST_TESS_FACTOR = 0.1; // Adjust to control tessellation density
+const float DIST_TESS_FACTOR = 0.1; 
 
 
 uniform vec3 cameraPos;		// Camera position in world space
