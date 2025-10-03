@@ -20,6 +20,9 @@ const char* fragmentShaderPath = "./generic.frag";
 const char* tesselationControlShaderPath = "./LOD_TesselationControl.tesc";
 const char* tesselationEvaluationShaderPath = "./LOD_TesselationEvaluation.tese";
 
+const char* sunVertexShaderPath = "./sun.vert";
+const char* sunFragmentShaderPath = "./sun.frag";
+
 // MATH CONSTANTS
 const double PI = 3.14159265358979323846;
 
@@ -54,10 +57,20 @@ const int noiseOctaveN = 6;									// Number of noise layers
 const int seed = 12345;										// IMPLEMENT RANDOM SEEDING
 
 // SKY SETTINGS
-const glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
+glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
+
+const glm::vec3 sunDayColor = glm::vec3(1.00f, 0.9f, 0.8f);
+const glm::vec3 sunDuskColor = glm::vec3(1.0, 0.25, 0.1);
+glm::vec3 sunColor = sunDuskColor;
 
 const float fogDensity = 0.001;
-const glm::vec3 fogColor = { 0.55f, 0.75f, 1.0f };
+glm::vec3 fogColor = { 0.55f, 0.75f, 1.0f };
+
+// DAY/NIGHT CYCLE SETTINGS
+const bool enableDayNightCycle = true;
+float timeOfDay = 12.0f;			// Current time of day (0.0 - 24.0)
+const float timeSpeed = 1.1f;	// Speed of time progression (hours per second)
+
 
 // RENDER SETTINGS
 const int renderDistance = 16;			// Render distance in chunks (Default: 16)
@@ -76,6 +89,10 @@ void UpdateBufferArrayObjects(GLuint& VBO, GLuint& EBO, const float* vertices, s
 // SHADING
 std::string LoadShaderSource(const char* filePath); // Load shader source code from file
 GLuint CompileShaderProgram(const char* vertexSource, const char* fragmentSource, const char* tesselationControlSource, const char* tesselationEvaluationSource); // Compile and link vertex and fragment shaders into a shader program
+GLuint CompileShaderProgram(const char* vertexSource, const char* fragmentSource); // Overloaded function for shaders without tesselation
+
+// DRAWING
+void DrawSun(GLuint shaderProgram, glm::vec3 &sunPosition); // Draw the sun
 
 // CALLBACKS
 void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods);	// Callback for keyboard input
@@ -98,9 +115,11 @@ double fractalNoise2D(double x, double y, int octaves, double persistence); // G
 // TODO: REFACTOR NOISE FUNCTION INPUT
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double), glm::vec2 chunkPos);	// Generate terrain mesh using Perlin noise
 
-
 // TERRAIN RENDERING
 void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<long long>& visibleChunks, glm::vec3 cameraPos, int renderDistance);
+
+// SKY RENDERING
+glm::vec3 calculateSunPosition(float timeOfDay); // Calculate sun position based on time of day
 
 
 // MATH
@@ -196,6 +215,7 @@ int main() {
 	// Initialize OpenGL and create window
 	GLFWwindow* window = initOpenGL();
 	
+	// Load and compile generic shader program
 	std::string vertexShaderSource = LoadShaderSource(vertexShaderPath);
 	std::string fragmentShaderSource = LoadShaderSource(fragmentShaderPath);
 	std::string tesselationControlShaderSource = LoadShaderSource(tesselationControlShaderPath);
@@ -204,6 +224,15 @@ int main() {
 	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource.c_str(), fragmentShaderSource.c_str(),
 												tesselationControlShaderSource.c_str(), tesselationEvaluationShaderSource.c_str());
 
+
+	// Load and compile sun shader program 
+	std::string sunVertexShaderSource = LoadShaderSource(sunVertexShaderPath);
+	std::string sunFragmentShaderSource = LoadShaderSource(sunFragmentShaderPath);
+
+	GLuint sunShaderProgram = CompileShaderProgram(sunVertexShaderSource.c_str(), sunFragmentShaderSource.c_str());
+
+
+	// Data structures
 	std::unordered_map<long long, Chunk> chunkMap; // Map to store chunks by their position key
 	std::vector<long long> visibleChunks; // List of currently loaded chunk keys
 
@@ -218,19 +247,28 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	// Link shader program
-	glUseProgram(shaderProgram);
 
-	// Set fog values
-	GLint fogDensityLoc = glGetUniformLocation(shaderProgram, "fogDensity");
-	if (fogDensityLoc >= 0) glUniform1f(fogDensityLoc, fogDensity);
-
-	GLint fogColorLoc = glGetUniformLocation(shaderProgram, "fogColor");
-	if (fogColorLoc >= 0) glUniform3f(fogColorLoc, fogColor.r, fogColor.g, fogColor.b);
+	double lastFrameTime = glfwGetTime();
 
 	while (!glfwWindowShouldClose(window)) {
+		// Calculate delta time
+		double currentFrameTime = glfwGetTime();
+		double deltaTime = currentFrameTime - lastFrameTime;
+		lastFrameTime = currentFrameTime;
+
+		// Clear screen
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		// Update time of day
+		if (enableDayNightCycle && !isPaused) {
+			timeOfDay += timeSpeed * (float)deltaTime;
+			if (timeOfDay >= 24.0f) timeOfDay -= 24.0f;
+			else if (timeOfDay < 0.0f) timeOfDay += 24.0f;
+		}
+
+		glm::vec3 sunWorldPos = calculateSunPosition(timeOfDay);
+
+		// Update graphical stuff
 		UpdateCamera(shaderProgram, cameraPos);
 		updateVisibleChunks(chunkMap, visibleChunks, cameraPos, renderDistance); // Update visible chunks based on camera position and render distance
 
@@ -239,9 +277,27 @@ int main() {
 		GLint texLoc = glGetUniformLocation(shaderProgram, "texture1");
 		if (texLoc >= 0) glUniform1i(texLoc, 0);
 
+
+		// Link shader program
+		glUseProgram(shaderProgram);
+
+		// Set fog values
+		GLint fogDensityLoc = glGetUniformLocation(shaderProgram, "fogDensity");
+		if (fogDensityLoc >= 0) glUniform1f(fogDensityLoc, fogDensity);
+
+		fogColor = skyColor*0.5f;
+
+		GLint fogColorLoc = glGetUniformLocation(shaderProgram, "fogColor");
+		if (fogColorLoc >= 0) glUniform3f(fogColorLoc, fogColor.r, fogColor.g, fogColor.b);
+
+
 		// Set light and view position uniforms
 		GLint lightLoc = glGetUniformLocation(shaderProgram, "lightPos");
-		if (lightLoc >= 0) glUniform3f(lightLoc, 10.0f, 10.0f, 10.0f);
+		if (lightLoc >= 0) glUniform3f(lightLoc, sunWorldPos.x, sunWorldPos.y, sunWorldPos.z);
+
+		GLint lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+		if (lightColorLoc >= 0) glUniform3f(lightColorLoc, sunColor.r, sunColor.g, sunColor.b);
+
 		GLint viewLocP = glGetUniformLocation(shaderProgram, "viewPos");
 		if (viewLocP >= 0) glUniform3f(viewLocP, cameraPos.x, cameraPos.y, cameraPos.z);
 
@@ -266,6 +322,9 @@ int main() {
 
 			glBindVertexArray(0);
 		}
+
+		// Render sun
+		DrawSun(sunShaderProgram, sunWorldPos);
 
 		// Swap buffers and poll events (Frame main loop)
 		glfwSwapBuffers(window);
@@ -415,9 +474,158 @@ GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource
 
 	return shaderProgram;			// Return shader program ID
 }
+GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource) {
+	GLint success;												// Check for compilation errors
+
+	// Vertex Shader
+	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);		// Create vertex shader
+	glShaderSource(vertexShader, 1, &vertexSource, NULL);		// Attach vertex shader source code
+	glCompileShader(vertexShader);								// Compile vertex shader
+
+	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);	// Check for compilation errors
+
+	if (!success) {
+		GLchar infoLog[512];
+		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+		std::cerr << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+
+
+	// Fragment Shader
+	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);	// Create fragment shader
+	glShaderSource(fragmentShader, 1, &fragmentSource, NULL);	// Attach fragment shader source code
+	glCompileShader(fragmentShader);							// Compile fragment shader
+
+	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);	// Check for compilation errors
+
+	if (!success) {
+		GLchar infoLog[512];
+		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+		std::cerr << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+
+
+	// Shader Program
+	GLuint shaderProgram = glCreateProgram();					// Create shader program
+	glAttachShader(shaderProgram, vertexShader);				// Attach vertex shader to shader program
+	glAttachShader(shaderProgram, fragmentShader);				// Attach fragment shader to shader program
+	glLinkProgram(shaderProgram);								// Link shader program
+
+	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);	// Check for linking errors
+
+	if (!success) {
+		GLchar infoLog[512];
+		glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+		std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+	}
+
+	// Clean up (Shaders already linked in program)
+	glDeleteShader(vertexShader);					// Delete vertex shader
+	glDeleteShader(fragmentShader);					// Delete fragment shader
+
+	return shaderProgram;			// Return shader program ID
+} //REFACTOR TO USE FULL IMPLEMENTATION
 
 // DRAWING
 void DrawTerrain(GLuint shaderProgram, GLuint VAO, size_t indexCount) {
+}
+void DrawSun(GLuint shaderProgram, glm::vec3& sunWorldPos) {
+	if (sunWorldPos.y <= 0.f) return;
+
+	static GLuint sunVAO = 0, sunVBO = 0;
+	if (sunVAO == 0) {
+		float quad[] = {
+			-1.0f,  1.0f, 
+			-1.0f, -1.0f, 
+			 1.0f, -1.0f, 
+			 1.0f,  1.0f,
+		};
+		glGenVertexArrays(1, &sunVAO);
+		glGenBuffers(1, &sunVBO);
+
+		glBindVertexArray(sunVAO);
+		glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+
+		glBindVertexArray(0);
+	}
+
+	// Project sun to NDC space
+	glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 30000.0f);
+	glm::vec4 clip = projection * view * glm::vec4(sunWorldPos, 1.0f);
+
+	if (clip.w <= 0.) return; // Sun is behind camera
+	clip /= clip.w; // Perspective divide
+
+	if (clip.z < -1.0f || clip.z > 1.0f) return; // Sun is outside clip space
+
+	glm::vec2 sunNDC = glm::vec2(clip.x, clip.y);
+
+	const float sunRadiusPixels = 50.0f; // Sun radius in pixels
+	float hx = sunRadiusPixels / (screenWidth / 2.0f); // Horizontal radius in NDC
+	float hy = sunRadiusPixels / (screenHeight / 2.0f); // Vertical radius in NDC
+
+	// Calculate sun color and intensity based on height
+	glm::vec3 dir = glm::normalize(sunWorldPos);
+	float elevation = glm::clamp(dir.y, 0.0f, 1.0f);
+
+	// Enfatizar el efecto de crepúsculo con una curva no lineal
+	float t = 1.0f - elevation;              // 1 = en el horizonte, 0 = arriba
+	float curve = powf(t, 1.5f);             // intensifica cambio cerca del horizonte
+
+	sunColor = glm::mix(sunDayColor, sunDuskColor, glm::clamp(curve, 0.0f, 1.0f));
+
+	// Intensidad: más brillante cuanto más alto; limitar rango para evitar deslumbrado excesivo
+	float intensity = glm::mix(0.8f, 2.0f, glm::smoothstep(0.0f, 1.0f, elevation));
+	skyColor = glm::mix(glm::vec4(0.4f, 0.65f, 1.0f, 1.0f), glm::vec4(0.015f, 0.015f, 0.075f, 1.0f), curve);
+	glClearColor(skyColor.r, skyColor.g, skyColor.b, skyColor.a);
+
+	// Radios interno/externo: sol más grande y difuso cerca del horizonte
+	float innerRadius = glm::mix(0.62f, 0.28f, elevation); // ligeramente más pequeño a mayor elevación
+	float outerRadius = glm::mix(0.82f, 0.46f, elevation); // mayor difusión cerca del horizonte
+
+
+	// Link shader program
+	glUseProgram(shaderProgram);
+
+	// Input uniforms
+	GLint sunPosLoc = glGetUniformLocation(shaderProgram, "sunNDC");
+	if (sunPosLoc >= 0) glUniform2f(sunPosLoc, sunNDC.x, sunNDC.y);
+
+	GLint sunRadiusLoc = glGetUniformLocation(shaderProgram, "sunSize");
+	if (sunRadiusLoc >= 0) glUniform2f(sunRadiusLoc, hx, hy);
+
+
+	GLint sunColorLoc = glGetUniformLocation(shaderProgram, "sunColor");
+	if (sunColorLoc >= 0) glUniform3fv(sunColorLoc, 1, glm::value_ptr(sunColor));
+
+	GLint innerRadiusLoc = glGetUniformLocation(shaderProgram, "innerRadius");
+	if (innerRadiusLoc >= 0) glUniform1f(innerRadiusLoc, innerRadius);
+
+	GLint outerRadiusLoc = glGetUniformLocation(shaderProgram, "outerRadius");
+	if (outerRadiusLoc >= 0) glUniform1f(outerRadiusLoc, outerRadius);
+
+	GLint intensityLoc = glGetUniformLocation(shaderProgram, "intensity");
+	if (intensityLoc >= 0) glUniform1f(intensityLoc, intensity);
+
+	// Draw sun quad
+	GLboolean prevDepthMask;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &prevDepthMask);
+
+	glDepthMask(GL_FALSE); // Disable depth writing
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+	glBindVertexArray(sunVAO);
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+	glBindVertexArray(0);
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthMask(prevDepthMask); // Restore previous depth writing state
 }
 
 // CALLBACKS
@@ -695,6 +903,15 @@ void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::ve
 	}
 }
 
+glm::vec3 calculateSunPosition(float timeOfDay) {
+	// Assuming timeOfDay is in range [0, 24] representing hours
+	float theta = (timeOfDay / 24.0f) * 2.0f * PI; // Convert time to angle in radians
+	// Calculate sun position in sky (simple circular path)
+	float zBias = 0.25f;
+	glm::vec3 dir = glm::normalize(glm::vec3(cos(theta), sin(theta), zBias));
+	const float radius = 1500.0f; // far away
+	return dir * radius;
+}
 
 // TESTING 
 void genCube(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices) {

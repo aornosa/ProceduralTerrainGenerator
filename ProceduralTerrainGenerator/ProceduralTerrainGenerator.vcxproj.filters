@@ -22,6 +22,9 @@
     <Filter Include="Archivos de sombreado\LOD">
       <UniqueIdentifier>{f05bd2b6-335f-4df8-a9d9-de8261e7eb46}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Archivos de sombreado\Sun">
+      <UniqueIdentifier>{b79ba2f5-ac7c-4ab2-baae-6d81e9e8e9b5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -37,6 +40,10 @@
     <None Include="LOD_TesselationEvaluation.tese">
       <Filter>Archivos de sombreado\LOD</Filter>
     </None>
+    <None Include="sun.vert">
+      <Filter>Archivos de sombreado\Sun</Filter>
+    </None>
+    <None Include="sun.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
