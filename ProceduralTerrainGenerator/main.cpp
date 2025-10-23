@@ -14,6 +14,9 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "noise.hpp"
+#include "tmath.hpp"
+
 // SHADER SOURCE PATHS
 const char* vertexShaderPath = "./generic.vert";
 const char* fragmentShaderPath = "./generic.frag";
@@ -23,8 +26,6 @@ const char* tesselationEvaluationShaderPath = "./LOD_TesselationEvaluation.tese"
 const char* sunVertexShaderPath = "./sun.vert";
 const char* sunFragmentShaderPath = "./sun.frag";
 
-// MATH CONSTANTS
-const double PI = 3.14159265358979323846;
 
 // RUNTIME VARIABLES
 bool isPaused = false;
@@ -114,7 +115,6 @@ Layered Perlin noise function to create fractal noise.
 Combines multiple octaves of Perlin noise to produce more complex and natural-looking terrain features.
 */
 double fractalNoise2D(double x, double y, int octaves, double persistence); // Generate fractal noise by combining multiple octaves of Perlin noise
-double worleyNoise3D(double x, double y, int numPoints); // Generate Worley noise for additional terrain variation
 // TODO: REFACTOR NOISE FUNCTION INPUT
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double), glm::vec2 chunkPos);	// Generate terrain mesh using Perlin noise
 
@@ -123,31 +123,6 @@ void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::ve
 
 // SKY RENDERING
 glm::vec3 calculateSunPosition(float timeOfDay); // Calculate sun position based on time of day
-
-
-// MATH
-double clamp(double value, double min, double max);
-/*
-Produces the dot product of the distance and gradient vectors.
-*/
-double dotGridGradient(int ix, int iy, double x, double y);
-/*
-Interpolation function (smoothstep) optimized for perlin.
-*/
-double interpolate(double a0, double a1, double w);
-/*
-Linear interpolation between a and b with t in [0, 1].
-a and b are the values to interpolate between,
-t is the interpolation factor.
-*/
-double lerp(double a, double b, double t);	
-/*
-Smoother interpolation between a and b with t in [0, 1].
-a and b are the values to interpolate between,
-t is the interpolation factor.
-*/
-double slerp(double a, double b, double t);
-
 
 
 // TESTING
@@ -684,39 +659,6 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	// Placeholder for mouse button handling (e.g., selecting terrain points)
 }
 
-// MATH
-double clamp(double value, double min, double max) {
-	return std::max(min, std::min(max, value));
-}
-glm::vec2 randomGradient(int ix, int iy) {
-	const unsigned w = 8 * sizeof(unsigned);
-	const unsigned s = w / 2; // rotation width
-	unsigned a = ix, b = iy;
-	a *= 3284157443;
-	
-	b ^= a << s | a >> (w - s);
-	b *= 1911520717;
-
-	a ^= b << s | b >> (w - s);
-	a *= 2048419325;
-
-	float random = a * (PI / ~(~0u >> 1));
-	return glm::vec2(cos(random), sin(random));
-}
-double dotGridGradient(int ix, int iy, double x, double y) {
-	glm::vec2 gradient = randomGradient(ix, iy);
-
-	// Clculate the distance vector
-	double dx = x - (double)ix;
-	double dy = y - (double)iy;
-
-	// Compute and return the dot-product
-	return (dx * gradient.x + dy * gradient.y);
-}
-double interpolate(double a0, double a1, double w) {
-	// Use smoothstep interpolation
-	return (a1 - a0) * (3.0 - w * 2.0) * w * w + a0;
-}
 
 // TERRAIN GENERATION
 double perlinNoise2D(double x, double y) {
@@ -965,7 +907,6 @@ void genCube(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices) {
 		indices.push_back(base + 3);
 	}
 }
-
 
 
 // INITIALIZATION

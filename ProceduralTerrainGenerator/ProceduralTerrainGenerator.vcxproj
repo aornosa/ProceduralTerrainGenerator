@@ -142,9 +142,11 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="noise.cpp" />
+    <ClCompile Include="tmath.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="noise.hpp" />
+    <ClInclude Include="tmath.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

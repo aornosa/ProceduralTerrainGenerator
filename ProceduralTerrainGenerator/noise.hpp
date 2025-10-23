@@ -1,10 +1,7 @@
-#include <algorithm>
 #include <vector>
 #include <random>
 
-#include <glm/glm.hpp>
-
-#define PI 3.14159265358979323846
+#include "tmath.hpp"
 
 // 2D
 
