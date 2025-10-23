@@ -71,7 +71,7 @@ double perlinNoise2D(double x, double y, int seed)
 	return interpolate(ix0, ix1, sy);
 }
 
-double fractalNoise2D(double (*noiseFunc2D)(double, double, int), double x, double y, int octaves, int seed, float frequency = 1.0, double persistence = 0.5, double amplitude = 1.0)
+double fractalNoise2D(double (*noiseFunc2D)(double, double, int), double x, double y, int octaves, int seed, float frequency, double persistence, double amplitude)
 {
 	double total = 0.0;
 	double maxValue = 0.0; // Used for normalizing result to [0,1]
@@ -86,7 +86,7 @@ double fractalNoise2D(double (*noiseFunc2D)(double, double, int), double x, doub
 
 
 // 3D
-double voronoiNoise3D(double x, double y, double z, float frequency, int seed, int numPoints)
+double voronoiNoise3D(double x, double y, double z, int seed, int numPoints)
 {
 	// Grid cell coordinates
 	int cx = (int)floor(x);
@@ -135,7 +135,7 @@ double voronoiNoise3D(double x, double y, double z, float frequency, int seed, i
 	return minDist;
 }
 
-double perlinNoise3D(double x, double y, double z, float frequency, int seed)
+double perlinNoise3D(double x, double y, double z, int seed)
 {
 	// Grid cell coordinates
 	int x0 = (int)floor(x);
@@ -154,7 +154,7 @@ double perlinNoise3D(double x, double y, double z, float frequency, int seed)
 	return 0.0; // Placeholder for 3D Perlin noise implementation
 }
 
-double fractalNoise3D(double (*noiseFunc3D)(double, double, double, int), double x, double y, double z, int octaves, int seed, float frequency = 1.0, double persistence = 0.5, double amplitude = 1.0)
+double fractalNoise3D(double (*noiseFunc3D)(double, double, double, int), double x, double y, double z, int octaves, int seed, float frequency, double persistence, double amplitude)
 {
 	double total = 0.0;
 	double maxValue = 0.0; // Used for normalizing result to [0,1]

@@ -10,21 +10,19 @@
 /// </summary>
 /// <param name="x">X component of the noise to sample</param>
 /// <param name="y">Y component of the noise to sample</param>
-/// <param name="frequency">Frequency of the noise</param>
 /// <param name="seed">Initial seed for randomness</param>
 /// <param name="numPoints">Number of points of resolution</param>
 /// <returns>Z equivalent component sampled at (x,y)</returns>
-double voronoiNoise2D(double x, double y, float frequency, int seed, int numPoints);
+double voronoiNoise2D(double x, double y, int seed, int numPoints);
 
 /// <summary>
 /// Perlin implementation of 2D noise
 /// </summary>
 /// <param name="x">X component of the noise to sample</param>
 /// <param name="y">Y component of the noise to sample</param>
-/// <param name="frequency">Frequency of the noise</param>
 /// <param name="seed">Initial seed for randomness</param>
 /// <returns>Z component sampled at (x,y)</returns>
-double perlinNoise2D(double x, double y, float frequency, int seed);
+double perlinNoise2D(double x, double y, int seed);
 
 /// <summary>
 /// Fractal implementation of 2D noise
@@ -37,7 +35,7 @@ double perlinNoise2D(double x, double y, float frequency, int seed);
 /// <param name="persistence">Persistence value for amplitude scaling</param>
 /// <param name="seed">Initial seed for randomness</param>
 /// <returns>Z component sampled at (x,y) of the stacked noise function</returns>
-double fractalNoise2D(double (*noiseFunc2D)(double, double), double x, double y, float frequency, int octaves, double persistence, int seed);
+double fractalNoise2D(double (*noiseFunc2D)(double, double, int), double x, double y, int octaves, int seed, float frequency = 1.0, double persistence = 0.5, double amplitude = 1.0);
 
 // 3D
 
@@ -47,11 +45,10 @@ double fractalNoise2D(double (*noiseFunc2D)(double, double), double x, double y,
 /// <param name="x">X component of the noise to sample</param>
 /// <param name="y">Y component of the noise to sample</param>
 /// <param name="z">Z component of the noise to sample</param>
-/// <param name="frequency">Frequency of the noise</param>
 /// <param name="seed">Initial seed for randomness</param>
 /// <param name="numPoints">Number of points of resolution</param>
 /// <returns>W component sampled at (x,y,z)</returns>
-double voronoiNoise3D(double x, double y, double z, float frequency, int seed, int numPoints);
+double voronoiNoise3D(double x, double y, double z, int seed, int numPoints);
 
 /// <summary>
 /// Perlin implementation of 3D noise
@@ -59,10 +56,9 @@ double voronoiNoise3D(double x, double y, double z, float frequency, int seed, i
 /// <param name="x">X component of the noise to sample</param>
 /// <param name="y">Y component of the noise to sample</param>
 /// <param name="z">Z component of the noise to sample</param>
-/// <param name="frequency">Frequency of the noise</param>
 /// <param name="seed">Initial seed for randomness</param>
 /// <returns>W component sampled at (x,y,z)</returns>
-double perlinNoise3D(double x, double y, double z, float frequency, int seed);
+double perlinNoise3D(double x, double y, double z, int seed);
 
 /// <summary>
 /// Fractal implementation of 3D noise
@@ -76,4 +72,4 @@ double perlinNoise3D(double x, double y, double z, float frequency, int seed);
 /// <param name="persistence">Persistence value for amplitude scaling</param>
 /// <param name="seed">Initial seed for randomness</param>
 /// <returns>W component sampled at (x,y,z) of the stacked noise function</returns>
-double fractalNoise3D(double (*noiseFunc3D)(double, double, double), double x, double y, double z, float frequency, int octaves, double persistence, int seed);
+double fractalNoise3D(double (*noiseFunc3D)(double, double, double, int), double x, double y, double z, int octaves, int seed, float frequency = 1.0, double persistence = 0.5, double amplitude = 1.0);
