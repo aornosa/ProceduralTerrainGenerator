@@ -661,6 +661,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 
 
 // TERRAIN GENERATION
+
 double perlinNoise2D(double x, double y) {
 	// Grid cell coordinates
 	int x0 = (int)floor(x);

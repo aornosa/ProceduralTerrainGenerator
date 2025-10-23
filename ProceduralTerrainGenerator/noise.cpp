@@ -151,7 +151,7 @@ double perlinNoise3D(double x, double y, double z, float frequency, int seed)
 	double sy = y - (double)y0;
 	double sz = z - (double)z0;
 
-
+	return 0.0; // Placeholder for 3D Perlin noise implementation
 }
 
 double fractalNoise3D(double (*noiseFunc3D)(double, double, double, int), double x, double y, double z, int octaves, int seed, float frequency = 1.0, double persistence = 0.5, double amplitude = 1.0)
