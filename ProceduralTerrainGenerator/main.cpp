@@ -26,6 +26,9 @@ const char* tesselationEvaluationShaderPath = "./LOD_TesselationEvaluation.tese"
 const char* sunVertexShaderPath = "./sun.vert";
 const char* sunFragmentShaderPath = "./sun.frag";
 
+const char* cloudVertexShaderPath = "./cloud.vert";
+const char* cloudFragmentShaderPath = "./cloud.frag";
+
 
 // RUNTIME VARIABLES
 bool isPaused = false;
@@ -77,8 +80,15 @@ const float timeSpeed = 0.1f;	// Speed of time progression (hours per second)
 // RENDER SETTINGS
 const int renderDistance = 16;			// Render distance in chunks (Default: 16)
 
+
+GLuint cloudTexture;
+static GLuint dummyVAO = 0;
+
+
 // OBJECT DECLARATIONS
 class Chunk;
+
+
 
 // FUNCTION DECLARATIONS
 GLFWwindow* initOpenGL();
@@ -103,6 +113,8 @@ void MouseMoveCallback(GLFWwindow* window, double xpos, double ypos);					// Cal
 void MouseScrollCallback(GLFWwindow* window, double xpos, double ypos);					// Callback for mouse scroll wheel input
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);			// Callback for mouse button input
 
+GLuint generateCloudTexture3D(); // Generate 3D texture for clouds
+
 // TERRAIN GENERATION
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double, int), glm::vec2 chunkPos);	// Generate terrain mesh using Perlin noise
 
@@ -115,6 +127,7 @@ glm::vec3 calculateSunPosition(float timeOfDay); // Calculate sun position based
 
 // TESTING
 void genCube(std::vector<GLfloat>& vertices, std::vector<GLuint>& indices); // Generate a cube mesh for testing purposes
+
 
 
 
@@ -196,6 +209,14 @@ int main() {
 	std::string sunFragmentShaderSource = LoadShaderSource(sunFragmentShaderPath);
 
 	GLuint sunShaderProgram = CompileShaderProgram(sunVertexShaderSource.c_str(), sunFragmentShaderSource.c_str());
+
+	// Load and compile cloud shader program
+	std::string cloudVertexShaderSource = LoadShaderSource(cloudVertexShaderPath);
+	std::string cloudFragmentShaderSource = LoadShaderSource(cloudFragmentShaderPath);
+
+	GLuint cloudShaderProgram = CompileShaderProgram(cloudVertexShaderSource.c_str(), cloudFragmentShaderSource.c_str());
+
+	cloudTexture = generateCloudTexture3D();
 
 
 	// Data structures
@@ -291,6 +312,7 @@ int main() {
 
 		// Render sun
 		DrawSun(sunShaderProgram, sunWorldPos);
+		DrawClouds(cloudShaderProgram, sunWorldPos);
 
 		// Swap buffers and poll events (Frame main loop)
 		glfwSwapBuffers(window);
@@ -594,7 +616,52 @@ void DrawSun(GLuint shaderProgram, glm::vec3& sunWorldPos) {
 	glDepthMask(prevDepthMask); // Restore previous depth writing state
 }
 void DrawClouds(GLuint shaderProgram, glm::vec3& sunWorldPos) {
-	// Placeholder for cloud rendering
+	// Get view and projection matrices
+	glm::mat4 v = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 0.1f, 3000.0f);
+
+	glm::vec3 sunDir = glm::normalize(sunWorldPos);
+
+	
+	if (dummyVAO == 0) {
+		glGenVertexArrays(1, &dummyVAO);
+	}
+	glBindVertexArray(dummyVAO);
+
+	glUseProgram(shaderProgram);
+	glUniform3fv(glGetUniformLocation(shaderProgram, "cameraPos"), 1, glm::value_ptr(cameraPos));
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "invView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(v)));
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "invProjection"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
+
+	glUniform3f(glGetUniformLocation(shaderProgram, "sunDir"), sunDir.x, sunDir.y, sunDir.z);
+	glUniform3f(glGetUniformLocation(shaderProgram, "sunColor"), 1.0f, 0.95f, 0.85f);
+	
+	glUniform1f(glGetUniformLocation(shaderProgram, "cloudBottom"), 10000.0f);
+	glUniform1f(glGetUniformLocation(shaderProgram, "cloudTop"), 20000.0f);
+	glUniform1f(glGetUniformLocation(shaderProgram, "stepSize"), 100.0f);
+	glUniform1f(glGetUniformLocation(shaderProgram, "densityMultiplier"), 0.1f);
+	glUniform1f(glGetUniformLocation(shaderProgram, "coverage"), 0.45f);
+	glUniform1f(glGetUniformLocation(shaderProgram, "edgeSoftness"), 0.0001f);
+	glUniform1f(glGetUniformLocation(shaderProgram, "noiseScale"), 0.00001f);
+	glUniform1f(glGetUniformLocation(shaderProgram, "phaseG"), 0.76f);
+
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_3D, cloudTexture);
+	glUniform1i(glGetUniformLocation(shaderProgram, "cloudTex"), 0);
+	
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// --- Draw fullscreen triangle ---
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+
+	// --- Optional: unbind VAO ---
+	glBindVertexArray(0);
 }
 
 // CALLBACKS
@@ -647,6 +714,43 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	// Placeholder for mouse button handling (e.g., selecting terrain points)
 }
 
+GLuint generateCloudTexture3D() {
+	static GLuint textureID = 0;
+	if (textureID != 0) return textureID;
+
+	// Generate 3D texture
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_3D, textureID);
+
+	const int size = 16;
+	std::vector<float> data(size * size * size);
+
+	// Fill texture with fractal voronoi noise
+	for (int z = 0; z < size; ++z) {
+		for (int y = 0; y < size; ++y) {
+			for (int x = 0; x < size; ++x) {
+				double nx = (double)x / (double)size;
+				double ny = (double)y / (double)size;
+				double nz = (double)z / (double)size;
+				data[x + y * size + z * size * size] = (float)fractalNoise3D(voronoiNoise3D, nx, ny, nz, 4, seed, 2.5, 0.5, 2.); // Scale coordinates for more detail
+				std::cout << "Generating cloud texture x slice " << x + 1 << " / " << size << "\t " << y + 1 << " / " << size << "\t " << z + 1 << "/" << size << std::flush << "\r";
+			}
+		}
+	}
+	// Upload texture data
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, size, size, size, 0, GL_RED, GL_FLOAT, data.data());
+
+	// Set texture parameters
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// Unbind and return texture
+	glBindTexture(GL_TEXTURE_3D, 0);
+	return textureID;
+}
 
 // TERRAIN GENERATION
 void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double, int), glm::vec2 chunkPos) {

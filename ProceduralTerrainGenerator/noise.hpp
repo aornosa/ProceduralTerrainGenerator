@@ -3,6 +3,8 @@
 
 #include "tmath.hpp"
 
+#define DEFAULT_VORONOI_POINTS 1
+
 // 2D
 
 /// <summary>
@@ -49,6 +51,7 @@ double fractalNoise2D(double (*noiseFunc2D)(double, double, int), double x, doub
 /// <param name="numPoints">Number of points of resolution</param>
 /// <returns>W component sampled at (x,y,z)</returns>
 double voronoiNoise3D(double x, double y, double z, int seed, int numPoints);
+double voronoiNoise3D(double x, double y, double z, int seed);
 
 /// <summary>
 /// Perlin implementation of 3D noise

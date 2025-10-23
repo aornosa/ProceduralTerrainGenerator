@@ -29,3 +29,6 @@ t is the interpolation factor.
 double slerp(double a, double b, double t);
 
 glm::vec2 randomGradient(int ix, int iy);
+
+
+double dotGridGradient3D(int ix, int iy, int iz, double x, double y, double z);

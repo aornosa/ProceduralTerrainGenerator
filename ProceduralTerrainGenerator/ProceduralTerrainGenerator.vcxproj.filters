@@ -25,6 +25,9 @@
     <Filter Include="Archivos de sombreado\Sun">
       <UniqueIdentifier>{b79ba2f5-ac7c-4ab2-baae-6d81e9e8e9b5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Archivos de sombreado\Clouds">
+      <UniqueIdentifier>{3d3073fc-a9f9-4b5d-9941-2d2ff4dcddd4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -44,6 +47,12 @@
       <Filter>Archivos de sombreado\Sun</Filter>
     </None>
     <None Include="sun.frag" />
+    <None Include="cloud.vert">
+      <Filter>Archivos de sombreado\Clouds</Filter>
+    </None>
+    <None Include="cloud.frag">
+      <Filter>Archivos de sombreado\Clouds</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

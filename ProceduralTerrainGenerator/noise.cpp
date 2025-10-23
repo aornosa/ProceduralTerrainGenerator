@@ -135,23 +135,47 @@ double voronoiNoise3D(double x, double y, double z, int seed, int numPoints)
 	return minDist;
 }
 
+double voronoiNoise3D(double x, double y, double z, int seed) {
+	return voronoiNoise3D(x, y, z, seed, DEFAULT_VORONOI_POINTS);
+}
+
 double perlinNoise3D(double x, double y, double z, int seed)
 {
 	// Grid cell coordinates
 	int x0 = (int)floor(x);
-	int y0 = (int)floor(y);
-	int z0 = (int)floor(z);
-
 	int x1 = x0 + 1;
+	int y0 = (int)floor(y);
 	int y1 = y0 + 1;
+	int z0 = (int)floor(z);
 	int z1 = z0 + 1;
 
-	// Compute sampled interpolation weights
-	double sx = x - (double)x0;
-	double sy = y - (double)y0;
-	double sz = z - (double)z0;
+	// Fractional part
+	double sx = x - x0;
+	double sy = y - y0;
+	double sz = z - z0;
 
-	return 0.0; // Placeholder for 3D Perlin noise implementation
+	// Dot products at cube corners
+	double n000 = dotGridGradient3D(x0, y0, z0, x, y, z);
+	double n100 = dotGridGradient3D(x1, y0, z0, x, y, z);
+	double n010 = dotGridGradient3D(x0, y1, z0, x, y, z);
+	double n110 = dotGridGradient3D(x1, y1, z0, x, y, z);
+	double n001 = dotGridGradient3D(x0, y0, z1, x, y, z);
+	double n101 = dotGridGradient3D(x1, y0, z1, x, y, z);
+	double n011 = dotGridGradient3D(x0, y1, z1, x, y, z);
+	double n111 = dotGridGradient3D(x1, y1, z1, x, y, z);
+
+	// Interpolate along x
+	double ix00 = interpolate(n000, n100, sx);
+	double ix10 = interpolate(n010, n110, sx);
+	double ix01 = interpolate(n001, n101, sx);
+	double ix11 = interpolate(n011, n111, sx);
+
+	// Interpolate along y
+	double iy0 = interpolate(ix00, ix10, sy);
+	double iy1 = interpolate(ix01, ix11, sy);
+
+	// Interpolate along z
+	return interpolate(iy0, iy1, sz);
 }
 
 double fractalNoise3D(double (*noiseFunc3D)(double, double, double, int), double x, double y, double z, int octaves, int seed, float frequency, double persistence, double amplitude)
