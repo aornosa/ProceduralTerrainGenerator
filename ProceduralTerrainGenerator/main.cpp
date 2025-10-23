@@ -57,7 +57,8 @@ const int noiseOctaveN = 6;									// Number of noise layers
 const int seed = 12345;										// IMPLEMENT RANDOM SEEDING
 
 // SKY SETTINGS
-glm::vec4 skyColor = { 0.4f, 0.65f, 1.0f, 1.0f };
+glm::vec4 defaultSkyColor = { 0.5f, 0.7f, 1.0f, 1.0f };
+glm::vec4 skyColor = defaultSkyColor;
 
 const glm::vec3 sunDayColor = glm::vec3(1.00f, 0.9f, 0.8f);
 const glm::vec3 sunDuskColor = glm::vec3(1.0, 0.25, 0.1);
@@ -68,8 +69,8 @@ glm::vec3 fogColor = { 0.55f, 0.75f, 1.0f };
 
 // DAY/NIGHT CYCLE SETTINGS
 const bool enableDayNightCycle = true;
-float timeOfDay = 12.0f;			// Current time of day (0.0 - 24.0)
-const float timeSpeed = 1.1f;	// Speed of time progression (hours per second)
+float timeOfDay = 8.0f;			// Current time of day (0.0 - 24.0)
+const float timeSpeed = 0.1f;	// Speed of time progression (hours per second)
 
 
 // RENDER SETTINGS
@@ -93,6 +94,7 @@ GLuint CompileShaderProgram(const char* vertexSource, const char* fragmentSource
 
 // DRAWING
 void DrawSun(GLuint shaderProgram, glm::vec3 &sunPosition); // Draw the sun
+void DrawClouds(GLuint shaderProgram, glm::vec3& sunPosition); // Draw clouds
 
 // CALLBACKS
 void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods);	// Callback for keyboard input
@@ -112,6 +114,7 @@ Layered Perlin noise function to create fractal noise.
 Combines multiple octaves of Perlin noise to produce more complex and natural-looking terrain features.
 */
 double fractalNoise2D(double x, double y, int octaves, double persistence); // Generate fractal noise by combining multiple octaves of Perlin noise
+double worleyNoise3D(double x, double y, int numPoints); // Generate Worley noise for additional terrain variation
 // TODO: REFACTOR NOISE FUNCTION INPUT
 void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double), glm::vec2 chunkPos);	// Generate terrain mesh using Perlin noise
 
@@ -530,7 +533,27 @@ GLuint CompileShaderProgram(const char *vertexSource, const char *fragmentSource
 void DrawTerrain(GLuint shaderProgram, GLuint VAO, size_t indexCount) {
 }
 void DrawSun(GLuint shaderProgram, glm::vec3& sunWorldPos) {
-	if (sunWorldPos.y <= 0.f) return;
+	// Calculate sun color and intensity based on height
+	glm::vec3 dir = glm::normalize(sunWorldPos);
+	float elevation = glm::clamp(dir.y, 0.0f, 1.0f);
+
+	// Non linear interpolation for color transition
+	float t = 1.0f - elevation;              // 1 at horizon, 0 at zenith
+	float curve = powf(t, 1.5f);             // intensify transition near horizon
+
+	sunColor = glm::mix(sunDayColor, sunDuskColor, glm::clamp(curve, 0.0f, 1.0f));
+
+	// Brighter and larger sun near horizon
+	float intensity = glm::mix(0.8f, 2.0f, glm::smoothstep(0.0f, 1.0f, elevation));
+	skyColor = glm::mix(glm::vec4(defaultSkyColor.r, defaultSkyColor.g, defaultSkyColor.b, 1.0f), glm::vec4(0.015f, 0.015f, 0.075f, 1.0f), curve);
+	glClearColor(skyColor.r, skyColor.g, skyColor.b, skyColor.a);
+
+	// Inner and outer radius of sun glow
+	float innerRadius = glm::mix(0.62f, 0.28f, elevation); // slight diffusion even at zenith
+	float outerRadius = glm::mix(0.82f, 0.46f, elevation); // more diffusion near horizon
+
+
+	if (sunWorldPos.y <= 0.f) return;	// Do not draw sun if below horizon
 
 	static GLuint sunVAO = 0, sunVBO = 0;
 	if (sunVAO == 0) {
@@ -569,26 +592,6 @@ void DrawSun(GLuint shaderProgram, glm::vec3& sunWorldPos) {
 	float hx = sunRadiusPixels / (screenWidth / 2.0f); // Horizontal radius in NDC
 	float hy = sunRadiusPixels / (screenHeight / 2.0f); // Vertical radius in NDC
 
-	// Calculate sun color and intensity based on height
-	glm::vec3 dir = glm::normalize(sunWorldPos);
-	float elevation = glm::clamp(dir.y, 0.0f, 1.0f);
-
-	// Enfatizar el efecto de crepúsculo con una curva no lineal
-	float t = 1.0f - elevation;              // 1 = en el horizonte, 0 = arriba
-	float curve = powf(t, 1.5f);             // intensifica cambio cerca del horizonte
-
-	sunColor = glm::mix(sunDayColor, sunDuskColor, glm::clamp(curve, 0.0f, 1.0f));
-
-	// Intensidad: más brillante cuanto más alto; limitar rango para evitar deslumbrado excesivo
-	float intensity = glm::mix(0.8f, 2.0f, glm::smoothstep(0.0f, 1.0f, elevation));
-	skyColor = glm::mix(glm::vec4(0.4f, 0.65f, 1.0f, 1.0f), glm::vec4(0.015f, 0.015f, 0.075f, 1.0f), curve);
-	glClearColor(skyColor.r, skyColor.g, skyColor.b, skyColor.a);
-
-	// Radios interno/externo: sol más grande y difuso cerca del horizonte
-	float innerRadius = glm::mix(0.62f, 0.28f, elevation); // ligeramente más pequeño a mayor elevación
-	float outerRadius = glm::mix(0.82f, 0.46f, elevation); // mayor difusión cerca del horizonte
-
-
 	// Link shader program
 	glUseProgram(shaderProgram);
 
@@ -626,6 +629,9 @@ void DrawSun(GLuint shaderProgram, glm::vec3& sunWorldPos) {
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDepthMask(prevDepthMask); // Restore previous depth writing state
+}
+void DrawClouds(GLuint shaderProgram, glm::vec3& sunWorldPos) {
+	// Placeholder for cloud rendering
 }
 
 // CALLBACKS
@@ -714,8 +720,6 @@ double interpolate(double a0, double a1, double w) {
 
 // TERRAIN GENERATION
 double perlinNoise2D(double x, double y) {
-	// Placeholder for Perlin noise function
-
 	// Grid cell coordinates
 	int x0 = (int)floor(x);
 	int y0 = (int)floor(y);
@@ -905,7 +909,7 @@ void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::ve
 
 glm::vec3 calculateSunPosition(float timeOfDay) {
 	// Assuming timeOfDay is in range [0, 24] representing hours
-	float theta = (timeOfDay / 24.0f) * 2.0f * PI; // Convert time to angle in radians
+	float theta = ((timeOfDay-8.0) / 24.0f) * 2.0f * PI; // Convert time to angle in radians (make sunrise at 8pm)
 	// Calculate sun position in sky (simple circular path)
 	float zBias = 0.25f;
 	glm::vec3 dir = glm::normalize(glm::vec3(cos(theta), sin(theta), zBias));
