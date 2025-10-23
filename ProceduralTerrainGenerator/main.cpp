@@ -54,7 +54,7 @@ const float terrainVertexSpacing = 64/terrainGridSize;		// Only applies to X and
 const float terrainRenderResolution = 0.5;					// Render resolution (0.1 = 10% of vertices rendered, 1.0 = 100% of vertices rendered)
 const float terrainHeightScale = 15.f;						// Scale height (Y axis)
 const float terrainFrequency = 0.0005f;						// Frequency of the noise function
-const int noiseOctaveN = 6;									// Number of noise layers
+const int noiseOctaveN = 16;								// Number of noise layers
 const int seed = 12345;										// IMPLEMENT RANDOM SEEDING
 
 // SKY SETTINGS
@@ -104,19 +104,7 @@ void MouseScrollCallback(GLFWwindow* window, double xpos, double ypos);					// C
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);			// Callback for mouse button input
 
 // TERRAIN GENERATION
-/*
-Function to sample 2D Perlin noise at coordinates (x, y).
-Generates smooth, continuous noise values that can be used for terrain height mapping.
-- Based Zipped's implementation in C++ -
-*/
-double perlinNoise2D(double x, double y);
-/*
-Layered Perlin noise function to create fractal noise.
-Combines multiple octaves of Perlin noise to produce more complex and natural-looking terrain features.
-*/
-double fractalNoise2D(double x, double y, int octaves, double persistence); // Generate fractal noise by combining multiple octaves of Perlin noise
-// TODO: REFACTOR NOISE FUNCTION INPUT
-void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double), glm::vec2 chunkPos);	// Generate terrain mesh using Perlin noise
+void generateTerrainMesh(std::vector<GLfloat> &vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double, int), glm::vec2 chunkPos);	// Generate terrain mesh using Perlin noise
 
 // TERRAIN RENDERING
 void updateVisibleChunks(std::unordered_map<long long, Chunk>& chunkMap, std::vector<long long>& visibleChunks, glm::vec3 cameraPos, int renderDistance);
@@ -661,46 +649,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 
 
 // TERRAIN GENERATION
-
-double perlinNoise2D(double x, double y) {
-	// Grid cell coordinates
-	int x0 = (int)floor(x);
-	int y0 = (int)floor(y);
-	int x1 = x0 + 1;
-	int y1 = y0 + 1;
-
-	// Compute sampled interpolation weights
-	double sx = x - (double)x0;
-	double sy = y - (double)y0;
-
-	// Compute dot products
-	// Top corners
-	double n0 = dotGridGradient(x0, y0, x, y);
-	double n1 = dotGridGradient(x1, y0, x, y);
-	double ix0 = interpolate(n0, n1, sx);		// Interpolate horizontally
-
-	// Bottom corners
-	n0 = dotGridGradient(x0, y1, x, y);
-	n1 = dotGridGradient(x1, y1, x, y);
-	double ix1 = interpolate(n0, n1, sx);		// Interpolate horizontally
-
-	// Interpolate vertically
-	return interpolate(ix0, ix1, sy);
-}
-double fractalNoise2D(double x, double y, int octaves, double persistence) {
-	double total = 0.0;
-	double frequency = 1.0;
-	double amplitude = 1.0;
-	double maxValue = 0.0; // Used for normalizing result to [0,1]
-	for (int i = 0; i < octaves; ++i) {
-		total += perlinNoise2D(x * frequency, y * frequency) * amplitude;
-		maxValue += amplitude;
-		amplitude *= persistence;
-		frequency *= 2.0;
-	}
-	return total / maxValue; // Normalize to [0,1]
-}
-void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double), glm::vec2 chunkPos) {
+void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &indices, double (*noise_fun)(double, double, int), glm::vec2 chunkPos) {
 	vertices.clear();
 	indices.clear();
 
@@ -720,7 +669,7 @@ void generateTerrainMesh(std::vector<GLfloat>& vertices, std::vector<GLuint> &in
 			double worldX = chunkWorldX + x * terrainVertexSpacing;
 			double worldZ = chunkWorldZ + z * terrainVertexSpacing;
 			// TODO: USE SEVERAL OCTAVES OF NOISE TO GET MORE REALISTIC TERRAIN
-			double h = pow(fractalNoise2D(worldX * terrainFrequency, worldZ * terrainFrequency, noiseOctaveN, 0.5) * terrainHeightScale,4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
+			double h = pow(fractalNoise2D(perlinNoise2D, worldX * terrainFrequency, worldZ * terrainFrequency, noiseOctaveN, seed) * terrainHeightScale,4); // Scale using amplitude and frequency as noise_fun(worldX*freq, worldZ*freq)*amplitude;
 			heights[z * terrainGridSize + x] = h;
 		}
 	}
