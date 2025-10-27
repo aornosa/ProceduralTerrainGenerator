@@ -14,8 +14,7 @@
 #include <algorithm>
 #include <unordered_map>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "texture_loader.hpp"
 
 #include "noise.hpp"
 #include "tmath.hpp"
@@ -247,8 +246,7 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	int width = 512, height = 512, nrChannels = 3;
-
-	unsigned char* data = stbi_load("./textures/grass_texture.jpg", &width, &height, &nrChannels, 0);
+	unsigned char* data = loadTexture("./textures/grass_texture.jpg", width, height, nrChannels);
 
 	if (data) {
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);

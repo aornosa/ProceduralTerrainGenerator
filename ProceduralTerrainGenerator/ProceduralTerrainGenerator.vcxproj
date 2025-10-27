@@ -145,11 +145,13 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="noise.cpp" />
+    <ClCompile Include="texture_loader.cpp" />
     <ClCompile Include="tmath.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="noise.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="texture_loader.hpp" />
     <ClInclude Include="tmath.hpp" />
   </ItemGroup>
   <ItemGroup>
