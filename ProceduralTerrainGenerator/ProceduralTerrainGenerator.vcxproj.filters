@@ -53,6 +53,9 @@
     <None Include="cloud.frag">
       <Filter>Archivos de sombreado\Clouds</Filter>
     </None>
+    <None Include="cloud.comp">
+      <Filter>Archivos de sombreado\Clouds</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

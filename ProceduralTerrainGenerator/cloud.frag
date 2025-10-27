@@ -23,6 +23,22 @@ uniform float densityMultiplier = 1.0;	// Overall density multiplier
 uniform float coverage = 0.45;			// Cloud coverage
 uniform float edgeSoftness = 0.1;		// Softness of cloud layer edges
 uniform float noiseScale;				// Scale of the noise texture
+uniform float ambientIntensity = 0.1;	// Ambient light intensity inside clouds
+
+uniform sampler2D depthMap;				// Depth map of the scene
+uniform sampler2D weatherMap;			// Weather map for cloud coverage modulation
+
+// Distance limiting for far clouds
+uniform float maxDistance = 30000.0;        // Máxima distancia de raymarch
+uniform float distanceFadeStart = 0.8;      // Fracción de maxDistance para iniciar el fade [0..1]
+uniform float depthEpsilon = 1e-2;
+
+// Weather map
+uniform float weatherScale = 10000; // Meter to UV scale
+uniform vec2  weatherOffset = vec2(0.0);    // UV offset for animation
+uniform float weatherStrength = 0.1;        // Strength of the weather map effect [0..1]
+uniform float weatherContrast = 1.0;        // Curve (>1 increases contrast, <1 decreases)
+
 
 vec3 reconstructWorldRay(vec2 uv) {
 	// Uv into NDC
@@ -40,23 +56,88 @@ vec3 reconstructWorldRay(vec2 uv) {
 	return normalize(rayDir);
 }
 
+vec3 reconstructWorldPosFromDepth(vec2 uv, float depth) {
+	vec2 ndc = uv * 2.0 - 1.0;
+	vec4 clip = vec4(ndc, depth * 2.0 - 1.0, 1.0);
+	vec4 view = invProjection * clip;
+	view /= view.w;
+	vec4 world = invView * vec4(view.xyz, 1.0);
+	return world.xyz;
+}
+
+bool terrainHitAlongRay(vec2 uv, vec3 rO, vec3 rD, out float tTerrain)
+{
+	float d = texture(depthMap, uv).r;
+	// d ~1.0 => sin geometría (cielo). No oclusión
+	if (d >= 1.0 - 1e-6) { tTerrain = 1e30; return false; }
+
+	vec3 worldPos = reconstructWorldPosFromDepth(uv, d);
+	// Proyección escalar del vector hasta el punto sobre la dirección del rayo
+	tTerrain = dot(worldPos - rO, rD);
+	return tTerrain > 0.0;
+}
+
 float hgPhase (float cosTheta, float g) {
 	float g2 = g * g;
 	float denom = pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
-	return (1.0 - g2) / (4.0 * 3.14159265 * denom);
+	return (1.0 - g2) / (4.0 * 3.1415926535 * denom);
 }
 
 float heightMask(float y) {
     float h = clamp((y - cloudBottom) / max(cloudTop - cloudBottom, 1e-3), 0.0, 1.0);
+
     float b = smoothstep(0.0, edgeSoftness, h);
+
     float t = 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, h);
+
     return b * t;
+}
+
+float fbmNoise(vec3 p) {
+	float sum = 0.0;
+	float amp = 0.5;
+	mat3 rot = mat3(
+		0.00,  0.80,  0.60,
+		-0.80,  0.36, -0.48,
+		-0.60, -0.48,  0.64
+	);
+
+	for(int i = 0; i < 5; ++i) {
+		// Use fract to keep coordinates in [0,1) if texture wrap is REPEAT.
+		// We still get continuous detail because we accumulate octaves with different scales.
+		sum += amp * texture(cloudTex, fract(p)).r;
+		p = rot * p * 2.0 + vec3(37.0 * float(i), 17.0 * float(i), 13.0 * float(i)); // rotate + offset to reduce repetition
+		amp *= 0.5;
+	}
+	return sum;
 }
 
 float sampleCloudDensity(vec3 pos) {
 	vec3 localPos = pos * noiseScale;
-	float d = max(texture(cloudTex, fract(localPos)).r - coverage, 0.0);  // umbral de cobertura
-    d *= heightMask(pos.y);
+
+	// Weather map xzplane
+    vec2 wuv = pos.xz * weatherScale + weatherOffset;
+    float w = texture(weatherMap, wuv).r;
+    w = pow(clamp(w, 0.0, 1.0), weatherContrast);
+
+	// 3D detail noise
+	float n = fbmNoise(localPos);
+
+	float localCoverage = clamp(coverage + (1.0 - w) * weatherStrength, 0.0, 1.0);
+
+	// Smooth threshold around coverage instead of hard clamp to avoid 'cutout' silhouettes.
+	// Tweak softness to taste; smaller -> sharper cut.
+	float softness = 0.25;
+	float base = smoothstep(localCoverage - softness, localCoverage + softness, n);
+
+	// Apply vertical height mask so clouds fade at top/bottom.
+	float h = heightMask(pos.y);
+
+	// Final density
+	float d = base * h;
+
+	// Optional small power to push contrast without hard edges
+	d = pow(d, 1.1);
     return d; 
 }
 
@@ -67,25 +148,29 @@ vec4 rayMarch (vec3 rO, vec3 rD, float t0, float t1) {
 
 	float t = t0;
 
-	for(int i = 0; i < 128 && t < t1; i++) {
+	for(int i = 0; i < 512 && t < t1; i++) {
 		vec3 pos = 	rO + rD * t;
 		float density = sampleCloudDensity(pos);
 
-		if(density > 0.01) // Early exit for low density
+		if(density > 0.0001) // Early exit for low density
 		{
 			float sigma_t = density * densityMultiplier;
 			float stepTransmittance = exp(-sigma_t * stepSize);
 
 			// Shadow approximation
 			float lightDensity = sampleCloudDensity(pos + sunDir * 1000.0);
-			float lightTransmittance = exp(-lightDensity * densityMultiplier * 0.5);
+			float lightTransmittance = exp(-lightDensity * densityMultiplier * 0.01);
+
 
 			float phase = hgPhase(dot(rD, sunDir), phaseG);
 
 			vec3 scattering = sunColor * lightTransmittance * phase * sigma_t;
+			vec3 multiple = vec3(1.0) * ambientIntensity * sigma_t;
 
-			color += transmittance * scattering * (1.0 - stepTransmittance);
-			transmittance *= stepTransmittance;
+
+			color += transmittance * (scattering+multiple) * (1.0 - stepTransmittance);
+
+			transmittance = mix(transmittance, transmittance * stepTransmittance, 0.4);
 
 			if (transmittance < 0.001) break;
 		}
@@ -93,7 +178,7 @@ vec4 rayMarch (vec3 rO, vec3 rD, float t0, float t1) {
 		t += stepSize;
 	}
 
-	return vec4(color, 1.0 - transmittance);
+	return vec4(color * sunColor, 1.0 - transmittance);
 }
 
 void main() {

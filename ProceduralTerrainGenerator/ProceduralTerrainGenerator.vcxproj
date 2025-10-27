@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="cloud.comp" />
     <None Include="cloud.frag" />
     <None Include="cloud.vert" />
     <None Include="generic.frag" />
