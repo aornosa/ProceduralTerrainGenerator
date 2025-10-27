@@ -149,7 +149,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="noise.hpp" />
+    <ClInclude Include="stb_image.h" />
     <ClInclude Include="tmath.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="textures\grass_texture.jpg" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

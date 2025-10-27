@@ -14,6 +14,9 @@
 #include <algorithm>
 #include <unordered_map>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include "noise.hpp"
 #include "tmath.hpp"
 
@@ -201,15 +204,15 @@ public:
 int main() {
 	// Initialize OpenGL and create window
 	GLFWwindow* window = initOpenGL();
-	
+
 	// Load and compile generic shader program
 	std::string vertexShaderSource = LoadShaderSource(vertexShaderPath);
 	std::string fragmentShaderSource = LoadShaderSource(fragmentShaderPath);
 	std::string tesselationControlShaderSource = LoadShaderSource(tesselationControlShaderPath);
 	std::string tesselationEvaluationShaderSource = LoadShaderSource(tesselationEvaluationShaderPath);
-	
+
 	GLuint shaderProgram = CompileShaderProgram(vertexShaderSource.c_str(), fragmentShaderSource.c_str(),
-												tesselationControlShaderSource.c_str(), tesselationEvaluationShaderSource.c_str());
+		tesselationControlShaderSource.c_str(), tesselationEvaluationShaderSource.c_str());
 
 
 	// Load and compile sun shader program 
@@ -233,15 +236,27 @@ int main() {
 	std::vector<long long> visibleChunks; // List of currently loaded chunk keys
 
 
-	// Create a simple 1x1 white texture so shader sampling is valid (CHANGE FOR TEXTURE GENERATION/SAMPLING)
-	GLuint whiteTexture = 0;
-	glGenTextures(1, &whiteTexture);
-	glBindTexture(GL_TEXTURE_2D, whiteTexture);
-	unsigned char whitePixel[3] = { 45, 150, 75 };
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, whitePixel);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	//Load grass texture
+	GLuint grassTexture;
+	glGenTextures(1, &grassTexture);
+	glBindTexture(GL_TEXTURE_2D, grassTexture);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	int width = 512, height = 512, nrChannels = 3;
+
+	unsigned char* data = stbi_load("./textures/grass_texture.jpg", &width, &height, &nrChannels, 0);
+
+	if (data) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else 
+		std::cout << "\nFailed to load texture" << std::endl;
+
 
 
 	double lastFrameTime = glfwGetTime();
@@ -273,7 +288,7 @@ int main() {
 		updateVisibleChunks(chunkMap, visibleChunks, cameraPos, renderDistance); // Update visible chunks based on camera position and render distance
 
 		// TESTING RENDER CUBE
-		glBindTexture(GL_TEXTURE_2D, whiteTexture);
+		glBindTexture(GL_TEXTURE_2D, grassTexture);
 		GLint texLoc = glGetUniformLocation(shaderProgram, "texture1");
 		if (texLoc >= 0) glUniform1i(texLoc, 0);
 
@@ -552,6 +567,7 @@ GLuint generateCloudTexture3D() {
 			}
 		}
 	}
+	std::cout << std::endl;
 	// Upload texture data
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, size, size, size, 0, GL_RED, GL_FLOAT, data.data());
 
